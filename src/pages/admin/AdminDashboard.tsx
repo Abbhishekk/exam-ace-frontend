@@ -1,0 +1,225 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  GraduationCap, 
+  BookOpen, 
+  FileQuestion, 
+  ClipboardList, 
+  Users, 
+  Trophy,
+  LogOut,
+  Plus,
+  BarChart3
+} from "lucide-react";
+import { toast } from "sonner";
+import { Link } from "react-router-dom";
+
+const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/auth');
+        return;
+      }
+
+      // Check if user is admin
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      if (!roleData || roleData.role !== 'admin') {
+        toast.error("Access denied. Admin only.");
+        navigate('/student');
+        return;
+      }
+
+      setUser(session.user);
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate('/auth');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Logged out successfully");
+    navigate('/auth');
+  };
+
+  const menuItems = [
+    {
+      title: "Manage Classes",
+      description: "Add, edit, or remove classes (11, 12)",
+      icon: GraduationCap,
+      href: "/admin/classes",
+      color: "bg-primary/10 text-primary"
+    },
+    {
+      title: "Manage Subjects",
+      description: "Organize subjects by class",
+      icon: BookOpen,
+      href: "/admin/subjects",
+      color: "bg-secondary/10 text-secondary"
+    },
+    {
+      title: "Question Bank",
+      description: "Add and manage MCQ questions",
+      icon: FileQuestion,
+      href: "/admin/questions",
+      color: "bg-success/10 text-success"
+    },
+    {
+      title: "Create Exam",
+      description: "Create new exams with question selection",
+      icon: ClipboardList,
+      href: "/admin/exams/create",
+      color: "bg-warning/10 text-warning"
+    },
+    {
+      title: "View Submissions",
+      description: "Review student exam submissions",
+      icon: Users,
+      href: "/admin/submissions",
+      color: "bg-accent text-accent-foreground"
+    },
+    {
+      title: "Leaderboard",
+      description: "View top performers",
+      icon: Trophy,
+      href: "/admin/leaderboard",
+      color: "bg-destructive/10 text-destructive"
+    }
+  ];
+
+  const stats = [
+    { label: "Total Students", value: "0", icon: Users },
+    { label: "Total Exams", value: "0", icon: ClipboardList },
+    { label: "Questions", value: "0", icon: FileQuestion },
+    { label: "Avg Score", value: "0%", icon: BarChart3 },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Sidebar */}
+      <aside className="fixed left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border p-6 hidden lg:block">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center">
+            <GraduationCap className="w-6 h-6 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="font-display font-bold text-sidebar-foreground">ExamPro</h1>
+            <p className="text-xs text-sidebar-foreground/60">Admin Panel</p>
+          </div>
+        </div>
+
+        <nav className="space-y-2">
+          {menuItems.map((item, index) => (
+            <Link
+              key={index}
+              to={item.href}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="text-sm font-medium">{item.title}</span>
+            </Link>
+          ))}
+        </nav>
+
+        <div className="absolute bottom-6 left-6 right-6">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground"
+            onClick={handleLogout}
+          >
+            <LogOut className="w-5 h-5 mr-3" />
+            Logout
+          </Button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="lg:ml-64 p-6 lg:p-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+              <h1 className="text-3xl font-display font-bold text-foreground">
+                Welcome back, Admin
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Manage your exams and students from here
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Link to="/admin/exams/create">
+                <Button variant="hero">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Exam
+                </Button>
+              </Link>
+              <Button variant="outline" className="lg:hidden" onClick={handleLogout}>
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {stats.map((stat, index) => (
+              <Card key={index} className="border-0 shadow-md">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <stat.icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                      <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Quick Actions */}
+          <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {menuItems.map((item, index) => (
+              <Link key={index} to={item.href}>
+                <Card className="border-0 shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer group">
+                  <CardHeader className="pb-2">
+                    <div className={`w-12 h-12 rounded-xl ${item.color} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
+                      <item.icon className="w-6 h-6" />
+                    </div>
+                    <CardTitle className="text-lg">{item.title}</CardTitle>
+                    <CardDescription>{item.description}</CardDescription>
+                  </CardHeader>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default AdminDashboard;
