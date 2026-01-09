@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { toast } from 'sonner'
 import { Loader2, ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from '@/lib/envs'
 
 interface Subject {
   id: string
@@ -135,7 +136,7 @@ const CreateExam = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       
-      const response = await fetch('http://localhost:3001/api/admin/create-rule-based-exam', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/create-rule-based-exam`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

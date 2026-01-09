@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from 'sonner'
 import { ArrowLeft, Users, Loader2, FileText } from 'lucide-react'
+import { API_BASE_URL } from '@/lib/envs'
 
 interface ExamSubmission {
   id: string
@@ -69,7 +70,7 @@ const AdminExamSubmissions = () => {
       }
 
       await fetchData()
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Authentication error: ' + error.message)
       navigate('/auth')
     }
@@ -89,7 +90,7 @@ const AdminExamSubmissions = () => {
 
       // Use Node.js backend API for submissions
       const { data: { session } } = await supabase.auth.getSession()
-      const response = await fetch('http://localhost:3001/api/admin/exam-submissions', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/exam-submissions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

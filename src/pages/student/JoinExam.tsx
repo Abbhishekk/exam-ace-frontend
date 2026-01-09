@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Loader2, BookOpen, Clock, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from '@/lib/envs'
 
 const JoinExam = () => {
   const navigate = useNavigate()
@@ -30,7 +31,7 @@ const JoinExam = () => {
         return
       }
 
-      const response = await fetch('http://localhost:3001/api/start-exam', {
+      const response = await fetch(`${API_BASE_URL}/api/start-exam`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

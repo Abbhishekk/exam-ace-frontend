@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { API_BASE_URL } from "@/lib/envs";
 
 interface DashboardAnalytics {
   total_exams_attempted: number;
@@ -68,7 +69,7 @@ const StudentDashboard = () => {
   const fetchDashboardAnalytics = async (token: string) => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/student/dashboard-analytics', {
+      const response = await fetch(`${API_BASE_URL}/api/student/dashboard-analytics`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

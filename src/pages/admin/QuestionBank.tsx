@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner'
 import { Plus, Loader2, ArrowLeft, Upload, X, Image } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { API_BASE_URL } from '@/lib/envs'
 
 interface Topic {
   id: string
@@ -102,7 +103,7 @@ const QuestionBank = () => {
       const formDataUpload = new FormData()
       formDataUpload.append('image', file)
 
-      const response = await fetch('http://localhost:3001/api/admin/upload-question-image', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/upload-question-image`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -210,7 +211,7 @@ const QuestionBank = () => {
         return
       }
 
-      const response = await fetch('http://localhost:3001/api/admin/questions', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/questions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -254,7 +255,7 @@ const QuestionBank = () => {
       })
       setImagePreview(null)
       fetchData()
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to add question: ' + error.message)
     } finally {
       setSubmitting(false)
@@ -274,7 +275,7 @@ const QuestionBank = () => {
       
       toast.success('Question deleted successfully')
       fetchData()
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to delete question: ' + error.message)
     }
   }

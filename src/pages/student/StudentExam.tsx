@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Clock, Send, AlertTriangle } from 'lucide-react'
+import { API_BASE_URL } from '@/lib/envs'
 
 interface Question {
   id: string
@@ -97,7 +98,7 @@ const StudentExam = () => {
         return
       }
 
-      const response = await fetch('http://localhost:3001/api/submit-exam', {
+      const response = await fetch(`${API_BASE_URL}/api/submit-exam`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

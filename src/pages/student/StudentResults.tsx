@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { CheckCircle, Trophy, Target, XCircle, ChevronDown, Loader2, Eye, Calendar, Award } from 'lucide-react'
 import { toast } from 'sonner'
+import { API_BASE_URL } from '@/lib/envs'
 
 interface ExamResult {
   attempt_id: string
@@ -66,7 +67,7 @@ const StudentResults = () => {
         return
       }
 
-      const response = await fetch('http://localhost:3001/api/student/all-results', {
+      const response = await fetch(`${API_BASE_URL}/api/student/all-results`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +98,7 @@ const StudentResults = () => {
         return
       }
 
-      const response = await fetch('http://localhost:3001/api/student/exam-review', {
+      const response = await fetch(`${API_BASE_URL}/api/student/exam-review`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

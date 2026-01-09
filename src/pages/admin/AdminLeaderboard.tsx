@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Trophy, Medal, Award, Users, Target } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { API_BASE_URL } from '@/lib/envs'
 
 interface Exam {
   id: string
@@ -68,7 +69,7 @@ const AdminLeaderboard = () => {
         return
       }
 
-      const response = await fetch('http://localhost:3001/api/leaderboard', {
+      const response = await fetch(`${API_BASE_URL}/api/leaderboard`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

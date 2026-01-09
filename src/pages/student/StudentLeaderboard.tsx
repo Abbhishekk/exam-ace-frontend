@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { Trophy, Medal, Award, Crown, Loader2, ArrowLeft } from 'lucide-react'
+import { API_BASE_URL } from '@/lib/envs'
 
 interface LeaderboardEntry {
   rank: number
@@ -54,7 +55,7 @@ const StudentLeaderboard = () => {
         return
       }
 
-      const response = await fetch('http://localhost:3001/api/leaderboard', {
+      const response = await fetch(`${API_BASE_URL}/api/leaderboard`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,7 +79,7 @@ const StudentLeaderboard = () => {
       }
       
       setLeaderboardData(transformedData)
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to fetch leaderboard: ' + error.message)
     } finally {
       setLoading(false)

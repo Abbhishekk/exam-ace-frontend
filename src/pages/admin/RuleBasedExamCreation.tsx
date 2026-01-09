@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner'
 import { Plus, Loader2, ArrowLeft, Wand2, FileText } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from '@/lib/envs'
 
 interface Subject {
   id: string
@@ -112,7 +113,7 @@ const RuleBasedExamCreation = () => {
       }
 
       // Step 1: Generate question paper using rules
-      const response = await fetch('http://localhost:3001/api/admin/generate-question-paper', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/generate-question-paper`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
