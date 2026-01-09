@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,16 +14,29 @@ import {
   Clock,
   CheckCircle2,
   Play,
-  User
+  User,
+  BarChart3,
+  Search
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+
+interface DashboardAnalytics {
+  total_exams_attempted: number;
+  total_exams_completed: number;
+  average_score: number;
+  highest_score: number;
+  overall_accuracy: number;
+  best_rank?: number;
+}
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [examCode, setExamCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+  const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -34,20 +48,47 @@ const StudentDashboard = () => {
       }
 
       setUser(session.user);
+      await fetchDashboardAnalytics(session.access_token);
     };
 
     checkAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!session) {
         navigate('/auth');
       } else {
         setUser(session.user);
+        await fetchDashboardAnalytics(session.access_token);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const fetchDashboardAnalytics = async (token: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:3001/api/student/dashboard-analytics', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics');
+      }
+
+      const data = await response.json();
+      setAnalytics(data);
+    } catch (error) {
+      console.error('Error fetching dashboard analytics:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -69,10 +110,30 @@ const StudentDashboard = () => {
   };
 
   const stats = [
-    { label: "Exams Taken", value: "0", icon: ClipboardList, color: "bg-primary/10 text-primary" },
-    { label: "Avg Score", value: "0%", icon: Trophy, color: "bg-secondary/10 text-secondary" },
-    { label: "Best Rank", value: "-", icon: Trophy, color: "bg-success/10 text-success" },
-    { label: "Pending", value: "0", icon: Clock, color: "bg-warning/10 text-warning" },
+    { 
+      label: "Exams Taken", 
+      value: loading ? "..." : analytics?.total_exams_completed?.toString() || "0", 
+      icon: ClipboardList, 
+      color: "bg-primary/10 text-primary" 
+    },
+    { 
+      label: "Avg Score", 
+      value: loading ? "..." : analytics?.average_score ? `${analytics.average_score}` : "0", 
+      icon: BarChart3, 
+      color: "bg-secondary/10 text-secondary" 
+    },
+    { 
+      label: "Best Rank", 
+      value: loading ? "..." : analytics?.best_rank ? `#${analytics.best_rank}` : "-", 
+      icon: Trophy, 
+      color: "bg-success/10 text-success" 
+    },
+    { 
+      label: "Pending", 
+      value: loading ? "..." : analytics ? (analytics.total_exams_attempted - analytics.total_exams_completed).toString() : "0", 
+      icon: Clock, 
+      color: "bg-warning/10 text-warning" 
+    },
   ];
 
   return (
@@ -90,6 +151,24 @@ const StudentDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <Link to="/student/join">
+              <Button variant="ghost" size="sm">
+                <Play className="w-4 h-4 mr-2" />
+                Join Exam
+              </Button>
+            </Link>
+            <Link to="/student/results">
+              <Button variant="ghost" size="sm">
+                <BarChart3 className="w-4 h-4 mr-2" />
+                My Results
+              </Button>
+            </Link>
+            <Link to="/student/leaderboard">
+              <Button variant="ghost" size="sm">
+                <Trophy className="w-4 h-4 mr-2" />
+                Leaderboard
+              </Button>
+            </Link>
             <Link to="/student/profile">
               <Button variant="ghost" size="sm">
                 <User className="w-4 h-4 mr-2" />
@@ -136,7 +215,7 @@ const StudentDashboard = () => {
             ))}
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-6">
+          <div className="grid lg:grid-cols-3 gap-6">
             {/* Join Exam Card */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
@@ -165,25 +244,109 @@ const StudentDashboard = () => {
                     {isJoining ? "Joining..." : "Join Exam"}
                   </Button>
                 </form>
+                <div className="mt-4">
+                  <Link to="/student/join">
+                    <Button variant="outline" className="w-full">
+                      <Search className="w-4 h-4 mr-2" />
+                      Browse Available Exams
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Recent Results Card */}
+            {/* My Results Card */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <div className="w-12 h-12 bg-success/10 rounded-xl flex items-center justify-center mb-2">
-                  <CheckCircle2 className="w-6 h-6 text-success" />
+                  <BarChart3 className="w-6 h-6 text-success" />
                 </div>
-                <CardTitle>Recent Results</CardTitle>
+                <CardTitle>My Results</CardTitle>
                 <CardDescription>
                   Your latest exam results and performance
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No exams taken yet</p>
-                  <p className="text-sm">Join an exam to see your results here</p>
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Loading results...</p>
+                  </div>
+                ) : analytics?.total_exams_completed === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No exams taken yet</p>
+                    <p className="text-sm">Join an exam to see your results here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Highest Score:</span>
+                      <span className="font-semibold">{analytics?.highest_score}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Accuracy:</span>
+                      <span className="font-semibold">{analytics?.overall_accuracy}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Completed:</span>
+                      <span className="font-semibold">{analytics?.total_exams_completed}</span>
+                    </div>
+                  </div>
+                )}
+                <div className="mt-4">
+                  <Link to="/student/results">
+                    <Button variant="outline" className="w-full">
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                      View All Results
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Leaderboard Card */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center mb-2">
+                  <Trophy className="w-6 h-6 text-yellow-600" />
+                </div>
+                <CardTitle>Leaderboard</CardTitle>
+                <CardDescription>
+                  See how you rank against other students
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Loading rankings...</p>
+                  </div>
+                ) : analytics?.total_exams_completed === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Trophy className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No rankings yet</p>
+                    <p className="text-sm">Complete exams to see your ranking</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {analytics?.best_rank ? `#${analytics.best_rank}` : 'N/A'}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Best Rank</p>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Avg Score:</span>
+                      <span className="font-semibold">{analytics?.average_score}%</span>
+                    </div>
+                  </div>
+                )}
+                <div className="mt-4">
+                  <Link to="/student/leaderboard">
+                    <Button variant="outline" className="w-full">
+                      <Trophy className="w-4 h-4 mr-2" />
+                      View Leaderboards
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

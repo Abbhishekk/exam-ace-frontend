@@ -22,7 +22,6 @@ const Auth = () => {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupName, setSignupName] = useState("");
-  const [role, setRole] = useState<"student" | "admin">("student");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +74,6 @@ const Auth = () => {
           emailRedirectTo: redirectUrl,
           data: {
             full_name: signupName,
-            role: role,
           }
         }
       });
@@ -231,29 +229,6 @@ const Auth = () => {
                       >
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>I am a</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        type="button"
-                        variant={role === "student" ? "default" : "outline"}
-                        onClick={() => setRole("student")}
-                        className="w-full"
-                      >
-                        <GraduationCap className="w-4 h-4 mr-2" />
-                        Student
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={role === "admin" ? "default" : "outline"}
-                        onClick={() => setRole("admin")}
-                        className="w-full"
-                      >
-                        <User className="w-4 h-4 mr-2" />
-                        Admin
-                      </Button>
                     </div>
                   </div>
                   <Button type="submit" className="w-full" variant="hero" size="lg" disabled={isLoading}>

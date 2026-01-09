@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -12,50 +11,19 @@ import {
   Trophy,
   LogOut,
   Plus,
-  BarChart3
+  BarChart3,
+  FolderOpen,
+  Hash,
+  Settings,
+  Eye,
+  Wand2
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/auth');
-        return;
-      }
-
-      // Check if user is admin
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (!roleData || roleData.role !== 'admin') {
-        toast.error("Access denied. Admin only.");
-        navigate('/student');
-        return;
-      }
-
-      setUser(session.user);
-    };
-
-    checkAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!session) {
-        navigate('/auth');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+  const location = useLocation();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -63,20 +31,47 @@ const AdminDashboard = () => {
     navigate('/auth');
   };
 
+  const isActiveRoute = (href: string) => {
+    if (href === '/admin' && location.pathname === '/admin') return true;
+    if (href !== '/admin' && location.pathname.startsWith(href)) return true;
+    return false;
+  };
+
   const menuItems = [
+    {
+      title: "Dashboard",
+      description: "Overview and statistics",
+      icon: BarChart3,
+      href: "/admin",
+      color: "bg-primary/10 text-primary"
+    },
     {
       title: "Manage Classes",
       description: "Add, edit, or remove classes (11, 12)",
       icon: GraduationCap,
       href: "/admin/classes",
-      color: "bg-primary/10 text-primary"
+      color: "bg-secondary/10 text-secondary"
     },
     {
       title: "Manage Subjects",
       description: "Organize subjects by class",
       icon: BookOpen,
       href: "/admin/subjects",
-      color: "bg-secondary/10 text-secondary"
+      color: "bg-blue-100 text-blue-600"
+    },
+    {
+      title: "Manage Chapters",
+      description: "Organize chapters by subject",
+      icon: FolderOpen,
+      href: "/admin/chapters",
+      color: "bg-purple-100 text-purple-600"
+    },
+    {
+      title: "Manage Topics",
+      description: "Organize topics by chapter",
+      icon: Hash,
+      href: "/admin/topics",
+      color: "bg-green-100 text-green-600"
     },
     {
       title: "Question Bank",
@@ -86,22 +81,29 @@ const AdminDashboard = () => {
       color: "bg-success/10 text-success"
     },
     {
+      title: "Manage Exams",
+      description: "View and manage all exams",
+      icon: Settings,
+      href: "/admin/exams",
+      color: "bg-indigo-100 text-indigo-600"
+    },
+    {
       title: "Create Exam",
       description: "Create new exams with question selection",
-      icon: ClipboardList,
+      icon: Plus,
       href: "/admin/exams/create",
       color: "bg-warning/10 text-warning"
     },
     {
-      title: "View Submissions",
-      description: "Review student exam submissions",
-      icon: Users,
-      href: "/admin/submissions",
-      color: "bg-accent text-accent-foreground"
+      title: "Rule-Based Exam",
+      description: "Auto-generate exams using rules",
+      icon: Wand2,
+      href: "/admin/exams/rule-based",
+      color: "bg-orange-100 text-orange-600"
     },
     {
-      title: "Leaderboard",
-      description: "View top performers",
+      title: "Leaderboards",
+      description: "View top performers across exams",
       icon: Trophy,
       href: "/admin/leaderboard",
       color: "bg-destructive/10 text-destructive"
@@ -130,16 +132,23 @@ const AdminDashboard = () => {
         </div>
 
         <nav className="space-y-2">
-          {menuItems.map((item, index) => (
-            <Link
-              key={index}
-              to={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="text-sm font-medium">{item.title}</span>
-            </Link>
-          ))}
+          {menuItems.map((item, index) => {
+            const isActive = isActiveRoute(item.href);
+            return (
+              <Link
+                key={index}
+                to={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  isActive 
+                    ? 'bg-sidebar-accent text-sidebar-foreground font-medium' 
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                }`}
+              >
+                <item.icon className="w-5 h-5" />
+                <span className="text-sm">{item.title}</span>
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="absolute bottom-6 left-6 right-6">
@@ -172,6 +181,12 @@ const AdminDashboard = () => {
                 <Button variant="hero">
                   <Plus className="w-4 h-4 mr-2" />
                   Create Exam
+                </Button>
+              </Link>
+              <Link to="/admin/exams/rule-based">
+                <Button variant="outline">
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  Rule-Based
                 </Button>
               </Link>
               <Button variant="outline" className="lg:hidden" onClick={handleLogout}>
