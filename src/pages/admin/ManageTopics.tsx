@@ -67,6 +67,9 @@ const ManageTopics = () => {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({ name: '', description: '', chapter_id: '' })
+  const [selectedClass, setSelectedClass] = useState('')
+  const [selectedSubject, setSelectedSubject] = useState('')
+  const [selectedChapter, setSelectedChapter] = useState('')
   const [filters, setFilters] = useState<Filters>({
     classId: '',
     subjectId: '',
@@ -150,7 +153,7 @@ const ManageTopics = () => {
     }
   }
 
-  // Filter logic
+  // Filter logic for table filters
   const filteredSubjects = useMemo(() => {
     return filters.classId 
       ? subjects.filter(s => s.class_id === filters.classId)
@@ -162,6 +165,19 @@ const ManageTopics = () => {
       ? chapters.filter(c => c.subject_id === filters.subjectId)
       : chapters
   }, [chapters, filters.subjectId])
+
+  // Filter logic for form dropdowns
+  const formSubjects = useMemo(() => {
+    return selectedClass 
+      ? subjects.filter(s => s.class_id === selectedClass)
+      : []
+  }, [subjects, selectedClass])
+
+  const formChapters = useMemo(() => {
+    return selectedSubject 
+      ? chapters.filter(c => c.subject_id === selectedSubject)
+      : []
+  }, [chapters, selectedSubject])
 
   const filteredTopics = useMemo(() => {
     return topics.filter(topic => {
@@ -207,7 +223,7 @@ const ManageTopics = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name.trim() || !formData.chapter_id) {
+    if (!formData.name.trim() || !selectedChapter) {
       toast.error('Topic name and chapter are required')
       return
     }
@@ -219,13 +235,14 @@ const ManageTopics = () => {
         .insert([{
           name: formData.name.trim(),
           description: formData.description.trim(),
-          chapter_id: formData.chapter_id
+          chapter_id: selectedChapter
         }])
 
       if (error) throw error
       
       toast.success('Topic added successfully')
-      setFormData({ name: '', description: '', chapter_id: '' })
+      // Only reset name and description, keep selections
+      setFormData({ ...formData, name: '', description: '' })
       fetchData()
     } catch (error) {
       toast.error('Failed to add topic: ' + error.message)
@@ -275,38 +292,83 @@ const ManageTopics = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Select
-                value={formData.chapter_id}
-                onValueChange={(value) => setFormData({ ...formData, chapter_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select chapter" />
-                </SelectTrigger>
-                <SelectContent>
-                  {chapters.map((chapter) => (
-                    <SelectItem key={chapter.id} value={chapter.id}>
-                      {chapter.subjects?.classes?.name} - {chapter.subjects?.name} - {chapter.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Select
+                  value={selectedClass}
+                  onValueChange={(value) => {
+                    setSelectedClass(value)
+                    setSelectedSubject('')
+                    setSelectedChapter('')
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map((cls) => (
+                      <SelectItem key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={selectedSubject}
+                  onValueChange={(value) => {
+                    setSelectedSubject(value)
+                    setSelectedChapter('')
+                  }}
+                  disabled={!selectedClass}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formSubjects.map((subject) => (
+                      <SelectItem key={subject.id} value={subject.id}>
+                        {subject.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={selectedChapter}
+                  onValueChange={setSelectedChapter}
+                  disabled={!selectedSubject}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select chapter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formChapters.map((chapter) => (
+                      <SelectItem key={chapter.id} value={chapter.id}>
+                        {chapter.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               
-              <Input
-                placeholder="Topic name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-              
-              <Input
-                placeholder="Description (optional)"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-              
-              <Button type="submit" disabled={submitting}>
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Topic'}
-              </Button>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input
+                  placeholder="Topic name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+                
+                <Input
+                  placeholder="Description (optional)"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+                
+                <Button type="submit" disabled={submitting || !selectedChapter}>
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Topic'}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
