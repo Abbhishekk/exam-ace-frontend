@@ -12,6 +12,7 @@ import ManageSubjects from "./pages/admin/ManageSubjects";
 import ManageChapters from "./pages/admin/ManageChapters";
 import ManageTopics from "./pages/admin/ManageTopics";
 import QuestionBank from "./pages/admin/QuestionBank";
+import ManageQuestions from "./pages/admin/ManageQuestions";
 import ManageExams from "./pages/admin/ManageExams";
 import AdminLeaderboard from "./pages/admin/AdminLeaderboard";
 import AdminExamSubmissions from "./pages/admin/AdminExamSubmissions";
@@ -43,7 +44,7 @@ const App = () => (
             <Route path="/admin/subjects" element={<AdminProtectedRoute><ManageSubjects /></AdminProtectedRoute>} />
             <Route path="/admin/chapters" element={<AdminProtectedRoute><ManageChapters /></AdminProtectedRoute>} />
             <Route path="/admin/topics" element={<AdminProtectedRoute><ManageTopics /></AdminProtectedRoute>} />
-            <Route path="/admin/questions" element={<AdminProtectedRoute><QuestionBank /></AdminProtectedRoute>} />
+            <Route path="/admin/questions" element={<AdminProtectedRoute><ManageQuestions /></AdminProtectedRoute>} />
             <Route path="/admin/exams" element={<AdminProtectedRoute><ManageExams /></AdminProtectedRoute>} />
             <Route path="/admin/exams/create" element={<AdminProtectedRoute><CreateExam /></AdminProtectedRoute>} />
             <Route path="/admin/exams/rule-based" element={<AdminProtectedRoute><CreateExamRuleBased /></AdminProtectedRoute>} />
