@@ -88,10 +88,14 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
       <aside className="fixed left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border p-6 hidden lg:block z-50">
         <Link to="/admin" className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center">
-            <GraduationCap className="w-6 h-6 text-primary-foreground" />
+            <img 
+              src="/exam-ace-logo.jpeg" 
+              alt="Exam Ace Logo" 
+              className=" rounded-lg" 
+            />
           </div>
           <div>
-            <h1 className="font-display font-bold text-sidebar-foreground">ExamPro</h1>
+            <h1 className="font-display font-bold text-sidebar-foreground">Exam Ace</h1>
             <p className="text-xs text-sidebar-foreground/60">Admin Panel</p>
           </div>
         </Link>

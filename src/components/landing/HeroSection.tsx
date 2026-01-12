@@ -25,11 +25,13 @@ export const HeroSection = () => {
       <div className="relative z-10 container mx-auto px-6 py-20 lg:py-32">
         <nav className="flex justify-between items-center mb-16 animate-fade-in">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center shadow-glow">
-              <GraduationCap className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <img 
+              src="/exam-ace-logo.jpeg" 
+              alt="Exam Ace Logo" 
+              className="w-10 h-10 rounded-lg shadow-glow"
+            />
             <span className="text-xl font-display font-bold text-primary-foreground">
-              ExamPro
+              Exam Ace
             </span>
           </div>
           <div className="flex gap-4">

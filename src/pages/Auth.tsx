@@ -116,10 +116,12 @@ const Auth = () => {
 
         <Card className="border-0 shadow-2xl bg-card/95 backdrop-blur-sm">
           <CardHeader className="text-center pb-4">
-            <div className="w-14 h-14 gradient-primary rounded-xl flex items-center justify-center mx-auto mb-4 shadow-glow">
-              <GraduationCap className="w-8 h-8 text-primary-foreground" />
-            </div>
-            <CardTitle className="text-2xl font-display">Welcome to ExamPro</CardTitle>
+            <img 
+              src="/exam-ace-logo.jpeg" 
+              alt="Exam Ace Logo" 
+              className="w-14 h-14 rounded-xl mx-auto mb-4 shadow-glow"
+            />
+            <CardTitle className="text-2xl font-display">Welcome to Exam Ace</CardTitle>
             <CardDescription>
               Sign in to your account or create a new one
             </CardDescription>

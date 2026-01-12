@@ -73,8 +73,12 @@ export const AdminProtectedRoute = ({ children }: AdminProtectedRouteProps) => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 gradient-primary rounded-xl flex items-center justify-center mx-auto animate-pulse">
-            <GraduationCap className="w-8 h-8 text-primary-foreground" />
+          <div className="w-32 h-32  rounded-xl flex items-center justify-center mx-auto animate-pulse">
+            <img 
+              src="/exam-ace-logo.jpeg" 
+              alt="Exam Ace Logo" 
+              className=" rounded-lg"
+            />
           </div>
           <div className="space-y-2">
             <h2 className="text-lg font-semibold">Verifying Access</h2>
