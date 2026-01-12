@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Eye, FileText, BarChart3, Calendar, Clock, Users } from 'lucide-react'
+import { Plus, Eye, FileText, BarChart3, Calendar, Clock, Users, Download } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -52,6 +52,39 @@ const ManageExams = () => {
       toast.success('Question paper generated successfully')
     } catch (error) {
       toast.error('Failed to generate question paper')
+    }
+  }
+
+  const handleGenerateResultsPDF = async (examId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/generate-exam-results-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ exam_id: examId })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate results PDF')
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `exam-results-${examId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      toast.success('Results PDF generated successfully')
+    } catch (error) {
+      toast.error('Failed to generate results PDF')
     }
   }
 
@@ -172,7 +205,15 @@ const ManageExams = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => navigate(`/admin/analytics/${exam.id}`)}
+                          onClick={() => handleGenerateResultsPDF(exam.id)}
+                        >
+                          <Download className="w-4 h-4 mr-1" />
+                          Results
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/admin/exams/${exam.id}/analytics`)}
                         >
                           <BarChart3 className="w-4 h-4 mr-1" />
                           Analytics

@@ -8,7 +8,7 @@ export const generateQuestionPaper = async (examId: string) => {
       throw new Error('Not authenticated')
     }
 
-    const response = await fetch('http://localhost:3001/api/admin/generate-exam-pdf', {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/generate-exam-pdf`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,45 +1,41 @@
 import { supabase } from './supabase'
 
 export interface ExamAnalytics {
-  exam_details: {
-    id: string
-    name: string
-    code: string
-    total_questions: number
-  }
-  overall_metrics: {
-    total_students_appeared: number
+  exam_id: string
+  overview: {
+    total_students: number
     average_score: number
     highest_score: number
     lowest_score: number
-    accuracy_percentage: number
+    overall_accuracy: number
   }
-  difficulty_analysis: Array<{
-    difficulty: string
+  difficulty_wise: Record<string, {
+    total: number
+    correct: number
     accuracy: number
-    total_questions: number
-    correct_answers: number
   }>
-  chapter_analysis: Array<{
-    chapter_name: string
+  chapter_wise: Record<string, {
+    total: number
+    correct: number
     accuracy: number
-    total_questions: number
-    correct_answers: number
   }>
 }
 
 export const getExamAnalytics = async (examId: string) => {
-  const { data, error } = await supabase.functions.invoke(
-    'exam-analytics',
-    {
-      body: { exam_id: examId }
-    }
-  )
+  const { data: { session } } = await supabase.auth.getSession()
+  
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/exam-analytics`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session?.access_token}`
+    },
+    body: JSON.stringify({ exam_id: examId })
+  })
 
-  if (error) {
-    console.error(error)
-    throw new Error(error.message)
+  if (!response.ok) {
+    throw new Error('Failed to fetch exam analytics')
   }
 
-  return data
+  return await response.json()
 }
