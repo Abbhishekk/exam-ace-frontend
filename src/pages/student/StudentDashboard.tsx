@@ -229,22 +229,7 @@ const StudentDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleJoinExam} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="exam-code">Exam Code</Label>
-                    <Input
-                      id="exam-code"
-                      type="text"
-                      placeholder="Enter exam code (e.g., JEE-2024-001)"
-                      value={examCode}
-                      onChange={(e) => setExamCode(e.target.value.toUpperCase())}
-                      className="uppercase"
-                    />
-                  </div>
-                  <Button type="submit" variant="hero" className="w-full" disabled={isJoining}>
-                    {isJoining ? "Joining..." : "Join Exam"}
-                  </Button>
-                </form>
+                
                 <div className="mt-4">
                   <Link to="/student/join">
                     <Button variant="outline" className="w-full">
