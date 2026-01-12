@@ -121,7 +121,7 @@ const ManageQuestions = () => {
     correct_option: '',
     marks: 4,
     negative_marks: 1,
-    difficulty: '',
+    difficulty: 'easy',
     explanation: '',
     image_url: '',
     explanation_image_url: ''
@@ -474,7 +474,7 @@ const renderMath = (content: string) => {
         correct_option: '',
         marks: 4,
         negative_marks: 1,
-        difficulty: '',
+        difficulty: 'easy',
         explanation: '',
         image_url: '',
         explanation_image_url: ''
