@@ -102,6 +102,20 @@ const AdminDashboard = () => {
       color: "bg-orange-100 text-orange-600"
     },
     {
+      title: "Multi-subject Exam",
+      description: "Auto-generate multi-subject exams using rules",
+      icon: Wand2,
+      href: "/admin/exams/multi-subject",
+      color: "bg-orange-100 text-orange-600"
+    },
+    {
+      title: "Enhanced Exam",
+      description: "Auto-generate exams using Subjects only",
+      icon: Wand2,
+      href: "/admin/exams/questions-enhanced",
+      color: "bg-orange-100 text-orange-600"
+    },
+    {
       title: "Leaderboards",
       description: "View top performers across exams",
       icon: Trophy,

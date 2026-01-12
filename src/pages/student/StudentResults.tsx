@@ -7,6 +7,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { CheckCircle, Trophy, Target, XCircle, ChevronDown, Loader2, Eye, Calendar, Award } from 'lucide-react'
 import { toast } from 'sonner'
 import { API_BASE_URL } from '@/lib/envs'
+import 'katex/dist/katex.min.css'
+import { InlineMath, BlockMath } from 'react-katex'
 
 interface ExamResult {
   attempt_id: string
@@ -126,6 +128,63 @@ const StudentResults = () => {
     if (rank === 2) return <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-medium">🥈 2nd</span>
     if (rank === 3) return <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs font-medium">🥉 3rd</span>
     return <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">#{rank}</span>
+  }
+
+  const renderMathText = (text: string) => {
+    if (!text) return text
+    
+    try {
+      const parts = []
+      let currentIndex = 0
+      
+      const blockMathRegex = /\$\$([^$]+?)\$\$/g
+      let match
+      
+      while ((match = blockMathRegex.exec(text)) !== null) {
+        if (match.index > currentIndex) {
+          const beforeText = text.slice(currentIndex, match.index)
+          parts.push(...renderInlineMath(beforeText))
+        }
+        
+        parts.push(<BlockMath key={`block-${match.index}`} math={match[1]} />)
+        currentIndex = match.index + match[0].length
+      }
+      
+      if (currentIndex < text.length) {
+        const remainingText = text.slice(currentIndex)
+        parts.push(...renderInlineMath(remainingText))
+      }
+      
+      return parts.length > 0 ? parts : text
+    } catch (error) {
+      console.error('Math rendering error:', error)
+      return text
+    }
+  }
+  
+  const renderInlineMath = (text: string) => {
+    if (!text) return []
+    
+    const parts = []
+    let currentIndex = 0
+    
+    const inlineMathRegex = /\$([^$]+?)\$/g
+    let match
+    
+    while ((match = inlineMathRegex.exec(text)) !== null) {
+      if (match.index > currentIndex) {
+        parts.push(text.slice(currentIndex, match.index))
+      }
+      
+      parts.push(<InlineMath key={`inline-${match.index}`} math={match[1]} />)
+      currentIndex = match.index + match[0].length
+    }
+    
+    if (currentIndex < text.length) {
+      parts.push(text.slice(currentIndex))
+    }
+    
+    return parts.length > 0 ? parts : [text]
   }
 
   if (loading) {
@@ -261,7 +320,7 @@ const StudentResults = () => {
                             {question.is_correct ? '✓' : question.selected_option ? '✗' : '—'} Question {index + 1}
                           </p>
                           <p className="text-sm text-muted-foreground truncate max-w-md">
-                            {question.question_text}
+                            {renderMathText(question.question_text)}
                           </p>
                         </div>
                       </div>
@@ -269,7 +328,7 @@ const StudentResults = () => {
                     </CollapsibleTrigger>
                     <CollapsibleContent className="p-4 border-l border-r border-b rounded-b-lg">
                       <div className="space-y-4">
-                        <p className="font-medium text-lg">{question.question_text}</p>
+                        <div className="font-medium text-lg">{renderMathText(question.question_text)}</div>
                         
                         {question.image_url && (
                           <div className="mb-4">
@@ -294,7 +353,8 @@ const StudentResults = () => {
                             }`}>
                               <div className="flex items-center justify-between">
                                 <span>
-                                  <span className="font-medium">{key}. </span>{text}
+                                  <span className="font-medium">{key}. </span>
+                                  <span>{renderMathText(text)}</span>
                                 </span>
                                 <div className="flex gap-2">
                                   {question.selected_option === key && (
@@ -324,7 +384,7 @@ const StudentResults = () => {
                         {question.explanation && (
                           <div className="p-4 bg-blue-50 border border-blue-200 rounded">
                             <p className="font-medium text-blue-800 mb-2">Explanation:</p>
-                            <p className="text-blue-700">{question.explanation}</p>
+                            <div className="text-blue-700">{renderMathText(question.explanation)}</div>
                           </div>
                         )}
                       </div>
@@ -336,7 +396,7 @@ const StudentResults = () => {
           </Card>
         )}
 
-        <div className="text-center mt-6">
+        <div className="flex justify-between items-center mt-6">
           <Button onClick={() => navigate('/student')}>
             Back to Dashboard
           </Button>

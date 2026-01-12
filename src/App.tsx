@@ -26,6 +26,8 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./components/AuthProvider";
 import CreateExam from "./pages/admin/CreateExam";
 import CreateExamRuleBased from "./pages/admin/CreateExamRuleBased";
+import CreateExamRuleBasedEnhanced from "./pages/admin/CreateExamRuleBasedEnhanced";
+import CreateMultiSubjectExam from "./pages/admin/CreateMultiSubjectExam";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +51,8 @@ const App = () => (
             <Route path="/admin/exams/create" element={<AdminProtectedRoute><CreateExam /></AdminProtectedRoute>} />
             <Route path="/admin/exams/rule-based" element={<AdminProtectedRoute><CreateExamRuleBased /></AdminProtectedRoute>} />
             <Route path="/admin/exams/:examId/submissions" element={<AdminProtectedRoute><AdminExamSubmissions /></AdminProtectedRoute>} />
+            <Route path="/admin/exams/questions-enhanced" element={<AdminProtectedRoute><CreateExamRuleBasedEnhanced /></AdminProtectedRoute>} />
+            <Route path="/admin/exams/multi-subject" element={<AdminProtectedRoute><CreateMultiSubjectExam /></AdminProtectedRoute>} />
             <Route path="/admin/leaderboard" element={<AdminProtectedRoute><AdminLeaderboard /></AdminProtectedRoute>} />
             <Route path="/student" element={<StudentDashboard />} />
             <Route path="/student/join" element={<JoinExam />} />
