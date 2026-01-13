@@ -37,7 +37,7 @@ const StudentExam = () => {
   const examCode = location.state?.examCode as string
 
   const [timeLeft, setTimeLeft] = useState(examData?.remaining_time_in_seconds || 0)
-  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [answers, setAnswers] = useState<Record<string, string | null>>({})
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [currentSection, setCurrentSection] = useState(0)
@@ -197,7 +197,8 @@ const StudentExam = () => {
     if (submitting) return
     
     // Show confirmation alert
-    const unattemptedCount = questions.length - Object.keys(answers).length
+    const answeredQuestions = Object.values(answers).filter(answer => answer !== null).length
+    const unattemptedCount = questions.length - answeredQuestions
     const confirmMessage = unattemptedCount > 0 
       ? `Are you sure you want to submit the exam?\n\nYou have ${unattemptedCount} unattempted questions.`
       : 'Are you sure you want to submit the exam?'
@@ -213,9 +214,9 @@ const StudentExam = () => {
     })));
     
     try {
-      const answersArray = Object.entries(answers).map(([questionId, selectedOption]) => ({
-        question_id: questionId,
-        selected_option: selectedOption
+      const answersArray = questions.map(question => ({
+        question_id: question.id,
+        selected_option: answers[question.id] || null
       }))
 
       const { data: { session } } = await supabase.auth.getSession()
@@ -264,8 +265,12 @@ const StudentExam = () => {
     }
   }
 
-  const handleAnswerChange = (questionId: string, value: string) => {
+  const handleAnswerChange = (questionId: string, value: string | null) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }))
+  }
+
+  const clearResponse = (questionId: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: null }))
   }
 
   const formatTime = (seconds: number) => {
@@ -344,24 +349,25 @@ const StudentExam = () => {
     return parts.length > 0 ? parts : [text]
   }
 
-  if (!examData) {
+  if (!examData || !examData.questions || examData.questions.length === 0) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card>
           <CardContent className="pt-6">
-            <p>No exam data found. Please join an exam first.</p>
+            <p>No questions found for this exam. Please contact your instructor.</p>
             <Button onClick={() => navigate('/student/join')} className="mt-4">
-              Join Exam
+              Back to Join Exam
             </Button>
           </CardContent>
         </Card>
       </div>
     )
   }
+console.log(examData);
 
   const questions = examData.questions
   const question = questions[currentQuestion]
-  const answeredCount = Object.keys(answers).length
+  const answeredCount = Object.values(answers).filter(answer => answer !== null).length
 
   // Group questions by section
   const sections = questions.reduce((acc, q, index) => {
@@ -379,6 +385,7 @@ const StudentExam = () => {
   }, {} as Record<string, { name: string; subject: string; questions: (Question & { globalIndex: number })[]; startIndex: number }>)
 
   const sectionArray = Object.values(sections)
+console.log(question);
 
   return (
     <div 
@@ -460,6 +467,19 @@ const StudentExam = () => {
                 </div>
               ))}
             </RadioGroup>
+            
+            {/* Clear Response Button */}
+            <div className="mt-4 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => clearResponse(question.id)}
+                disabled={!answers[question.id]}
+                className="text-red-600 border-red-200 hover:bg-red-50"
+              >
+                Clear Response
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -499,7 +519,7 @@ const StudentExam = () => {
               <p className="text-sm font-medium mb-3">Sections:</p>
               <div className="flex flex-wrap gap-2 mb-4">
                 {sectionArray.map((section, index) => {
-                  const sectionAnswered = section.questions.filter(q => answers[q.id]).length
+                  const sectionAnswered = section.questions.filter(q => answers[q.id] && answers[q.id] !== null).length
                   return (
                     <Button
                       key={section.name}
@@ -523,7 +543,7 @@ const StudentExam = () => {
                     variant={currentQuestion === index ? 'default' : 'outline'}
                     size="sm"
                     className={`w-10 h-10 p-0 ${
-                      answers[questions[index].id] 
+                      answers[questions[index].id] && answers[questions[index].id] !== null
                         ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200' 
                         : ''
                     }`}
