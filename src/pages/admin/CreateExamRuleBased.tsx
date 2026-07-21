@@ -10,6 +10,11 @@ import { Loader2, ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '@/lib/envs'
 
+interface Class {
+  id: string
+  name: string
+}
+
 interface Subject {
   id: string
   name: string
@@ -35,8 +40,10 @@ interface Rules {
 
 const CreateExam = () => {
   const navigate = useNavigate()
+  const [classes, setClasses] = useState<Subject[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [chapters, setChapters] = useState<Chapter[]>([])
+  const [selectedClass, setSelectedClass] = useState<string>('')
   const [selectedSubject, setSelectedSubject] = useState<string>('')
   const [rules, setRules] = useState<Rules>({})
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set())
@@ -50,8 +57,14 @@ const CreateExam = () => {
   })
 
   useEffect(() => {
-    fetchSubjects()
+    fetchClasses()
   }, [])
+
+  useEffect(() => {
+    if (selectedClass) {
+      fetchSubjects(selectedClass)
+    }
+  }, [selectedClass])
 
   useEffect(() => {
     if (selectedSubject) {
@@ -59,11 +72,29 @@ const CreateExam = () => {
     }
   }, [selectedSubject])
 
-  const fetchSubjects = async () => {
+
+  const fetchClasses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select('id, name')
+        .order('name')
+
+      if (error) throw error
+      setClasses(data || [])
+    } catch (error: any) {
+      toast.error('Failed to fetch classes: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchSubjects = async (classId: String) => {
     try {
       const { data, error } = await supabase
         .from('subjects')
-        .select('id, name')
+        .select('id, name,class_id')
+        .eq('class_id', classId)
         .order('name')
 
       if (error) throw error
@@ -88,6 +119,16 @@ const CreateExam = () => {
     } catch (error: any) {
       toast.error('Failed to fetch chapters: ' + error.message)
     }
+  }
+
+  const handleClassChange = (classId: string) => {
+    setSelectedClass(classId)
+    setSelectedSubject('')
+    setSubjects([])
+    setChapters([])
+    setRules({})
+    // setDifficultyDistribution({ easy: 0, medium: 0, hard: 0 })
+    // setAvailableCounts({ easy: 0, medium: 0, hard: 0 })
   }
 
   const handleSubjectChange = (subjectId: string) => {
@@ -121,7 +162,7 @@ const CreateExam = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.name.trim() || !formData.code.trim() || !formData.start_time) {
       toast.error('All fields are required')
       return
@@ -135,7 +176,7 @@ const CreateExam = () => {
     setSubmitting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       const response = await fetch(`${API_BASE_URL}/api/admin/create-rule-based-exam`, {
         method: 'POST',
         headers: {
@@ -202,13 +243,13 @@ const CreateExam = () => {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
-              
+
               <Input
                 placeholder="Exam code"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               />
-              
+
               <Input
                 type="datetime-local"
                 value={formData.start_time ? new Date(formData.start_time).toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).slice(0, 16) : ''}
@@ -218,7 +259,7 @@ const CreateExam = () => {
                   setFormData({ ...formData, start_time: istDateTime })
                 }}
               />
-              
+
               <Input
                 type="number"
                 placeholder="Duration (minutes)"
@@ -236,18 +277,33 @@ const CreateExam = () => {
             <CardTitle>Subject Selection</CardTitle>
           </CardHeader>
           <CardContent>
-            <Select value={selectedSubject} onValueChange={handleSubjectChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a subject" />
-              </SelectTrigger>
-              <SelectContent>
-                {subjects.map(subject => (
-                  <SelectItem key={subject.id} value={subject.id}>
-                    {subject.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+              <Select value={selectedClass} onValueChange={handleClassChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map(cls => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedSubject} onValueChange={handleSubjectChange} disabled={!selectedClass}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjects.map(subject => (
+                    <SelectItem key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
 
@@ -261,7 +317,7 @@ const CreateExam = () => {
               {chapters.map(chapter => {
                 const isExpanded = expandedChapters.has(chapter.id)
                 const chapterRule = rules[selectedSubjectName]?.[chapter.name] || { easy: 0, medium: 0, hard: 0 }
-                
+
                 return (
                   <Collapsible key={chapter.id} open={isExpanded} onOpenChange={() => toggleChapterExpanded(chapter.id)}>
                     <CollapsibleTrigger asChild>
@@ -349,12 +405,12 @@ const CreateExam = () => {
             </ul>
             <p><strong>Example Rule JSON:</strong></p>
             <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-{JSON.stringify({
-  "Physics": {
-    "Kinematics": { "easy": 3, "medium": 5, "hard": 2 },
-    "Laws of Motion": { "easy": 2, "medium": 3 }
-  }
-}, null, 2)}
+              {JSON.stringify({
+                "Physics": {
+                  "Kinematics": { "easy": 3, "medium": 5, "hard": 2 },
+                  "Laws of Motion": { "easy": 2, "medium": 3 }
+                }
+              }, null, 2)}
             </pre>
           </CardContent>
         </Card>

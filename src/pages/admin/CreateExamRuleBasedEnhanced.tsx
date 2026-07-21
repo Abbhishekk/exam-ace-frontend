@@ -63,8 +63,9 @@ const CreateExam = () => {
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [chapterQuestionCounts, setChapterQuestionCounts] = useState({});
   const [mode, setMode] = useState<'subject' | 'chapter'>('subject')
-  
+
   // Subject-level difficulty distribution
   const [difficultyDistribution, setDifficultyDistribution] = useState<DifficultyDistribution>({
     easy: 0,
@@ -73,7 +74,7 @@ const CreateExam = () => {
   })
   const [availableCounts, setAvailableCounts] = useState<QuestionCounts>({ easy: 0, medium: 0, hard: 0 })
   const [loadingCounts, setLoadingCounts] = useState(false)
-  
+
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -136,7 +137,7 @@ const CreateExam = () => {
     setLoadingCounts(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       const response = await fetch(`${API_BASE_URL}/api/admin/subject-question-counts/${subjectId}`, {
         headers: {
           'Authorization': `Bearer ${session?.access_token}`
@@ -181,12 +182,14 @@ const CreateExam = () => {
     setAvailableCounts({ easy: 0, medium: 0, hard: 0 })
   }
 
-  const handleSubjectChange = (subjectId: string) => {
-    setSelectedSubject(subjectId)
-    setRules({})
-    setChapters([])
-    setDifficultyDistribution({ easy: 0, medium: 0, hard: 0 })
-  }
+  const handleSubjectChange = async (subjectId: string) => {
+    setSelectedSubject(subjectId);
+    setRules({});
+    setChapters([]);
+    setDifficultyDistribution({ easy: 0, medium: 0, hard: 0 });
+
+    await fetchTotalQuestions(subjectId);
+  };
 
   const updateChapterRule = (subjectName: string, chapterName: string, difficulty: 'easy' | 'medium' | 'hard', count: number) => {
     setRules(prev => ({
@@ -211,9 +214,21 @@ const CreateExam = () => {
     setExpandedChapters(newExpanded)
   }
 
+  useEffect(() => {
+    const { easy, medium, hard } = difficultyDistribution;
+
+    console.log("Easy:", easy);
+    console.log("Medium:", medium);
+    console.log("Hard:", hard);
+  }, [
+    difficultyDistribution.easy,
+    difficultyDistribution.medium,
+    difficultyDistribution.hard
+  ]);
+
   const handleSubjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.name.trim() || !formData.code.trim() || !formData.start_time) {
       toast.error('All fields are required')
       return
@@ -227,8 +242,8 @@ const CreateExam = () => {
 
     // Validate against available counts
     if (difficultyDistribution.easy > availableCounts.easy ||
-        difficultyDistribution.medium > availableCounts.medium ||
-        difficultyDistribution.hard > availableCounts.hard) {
+      difficultyDistribution.medium > availableCounts.medium ||
+      difficultyDistribution.hard > availableCounts.hard) {
       toast.error('Requested questions exceed available counts')
       return
     }
@@ -236,7 +251,7 @@ const CreateExam = () => {
     setSubmitting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       const response = await fetch(`${API_BASE_URL}/api/admin/create-subject-exam`, {
         method: 'POST',
         headers: {
@@ -262,6 +277,7 @@ const CreateExam = () => {
       toast.success(`Exam created successfully! ${result.exam.total_questions} questions selected.`)
       navigate('/admin')
     } catch (error: any) {
+      console.log(error)
       toast.error('Failed to create exam: ' + error.message)
     } finally {
       setSubmitting(false)
@@ -270,7 +286,7 @@ const CreateExam = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.name.trim() || !formData.code.trim() || !formData.start_time) {
       toast.error('All fields are required')
       return
@@ -284,7 +300,7 @@ const CreateExam = () => {
     setSubmitting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       const response = await fetch(`${API_BASE_URL}/api/admin/create-rule-based-exam`, {
         method: 'POST',
         headers: {
@@ -296,6 +312,7 @@ const CreateExam = () => {
           code: formData.code.trim(),
           start_time: formData.start_time,
           duration_minutes: formData.duration_minutes,
+          class_id: selectedClass,
           rules
         })
       })
@@ -326,6 +343,72 @@ const CreateExam = () => {
     }, 0)
   }
 
+  const fetchTotalQuestions = async (subjectId: string) => {
+    const { data, error } = await supabase
+      .from("subjects")
+      .select(`
+      id,
+      chapters (
+        id,
+        name,
+        topics (
+          id,
+          name,
+          questions (
+            id,
+            difficulty
+          )
+        )
+      )
+    `)
+      .eq("id", subjectId)
+      .single();
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    const counts: Record<
+      string,
+      {
+        easy: number;
+        medium: number;
+        hard: number;
+        total: number;
+      }
+    > = {};
+
+    data.chapters.forEach((chapter) => {
+      let easy = 0;
+      let medium = 0;
+      let hard = 0;
+
+      chapter.topics.forEach((topic) => {
+        topic.questions.forEach((question) => {
+
+          if (question.difficulty === "easy") {
+            easy++;
+          } else if (question.difficulty === "medium") {
+            medium++;
+          } else if (question.difficulty === "hard") {
+            hard++;
+          }
+
+        });
+      });
+
+      counts[chapter.id] = {
+        easy,
+        medium,
+        hard,
+        total: easy + medium + hard,
+      };
+    });
+
+    setChapterQuestionCounts(counts);
+  };
+
   const selectedSubjectName = subjects.find(s => s.id === selectedSubject)?.name || ''
 
   return (
@@ -354,13 +437,13 @@ const CreateExam = () => {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
-              
+
               <Input
                 placeholder="Exam code"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               />
-              
+
               <Input
                 type="datetime-local"
                 value={formData.start_time ? new Date(formData.start_time).toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).slice(0, 16) : ''}
@@ -370,7 +453,7 @@ const CreateExam = () => {
                   setFormData({ ...formData, start_time: istDateTime })
                 }}
               />
-              
+
               <Input
                 type="number"
                 placeholder="Duration (minutes)"
@@ -499,7 +582,7 @@ const CreateExam = () => {
                               />
                             </div>
                           </div>
-                          
+
                           {getTotalQuestions() > 0 && (
                             <div className="mt-4 p-4 bg-muted rounded-lg">
                               <div className="text-sm font-medium">Total Questions: {getTotalQuestions()}</div>
@@ -524,15 +607,18 @@ const CreateExam = () => {
                         {chapters.map(chapter => {
                           const isExpanded = expandedChapters.has(chapter.id)
                           const chapterRule = rules[selectedSubjectName]?.[chapter.name] || { easy: 0, medium: 0, hard: 0 }
-                          
+
                           return (
                             <Collapsible key={chapter.id} open={isExpanded} onOpenChange={() => toggleChapterExpanded(chapter.id)}>
                               <CollapsibleTrigger asChild>
-                                <Button variant="outline" className="w-full justify-between">
+                                <Button variant="outline" className="w-full justify-between ">
                                   <span>{chapter.name}</span>
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm text-muted-foreground">
-                                      Total: {(chapterRule.easy || 0) + (chapterRule.medium || 0) + (chapterRule.hard || 0)} questions
+                                      Selected: {(chapterRule.easy || 0) + (chapterRule.medium || 0) + (chapterRule.hard || 0)} questions
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">
+                                      Total: {chapterQuestionCounts[chapter.id]?.total ?? 0} questions
                                     </span>
                                     {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                   </div>
@@ -542,9 +628,11 @@ const CreateExam = () => {
                                 <div className="grid grid-cols-3 gap-4">
                                   <div>
                                     <label className="text-sm font-medium text-green-600">Easy</label>
+                                    <span className="text-xs text-muted-foreground mx-1">Available: {chapterQuestionCounts[chapter.id]?.easy ?? 0}</span>
                                     <Input
                                       type="number"
                                       min="0"
+                                      max={chapterQuestionCounts[chapter.id]?.easy ?? 0}
                                       value={chapterRule.easy || ''}
                                       onChange={(e) => updateChapterRule(selectedSubjectName, chapter.name, 'easy', Number(e.target.value) || 0)}
                                       placeholder="0"
@@ -552,9 +640,11 @@ const CreateExam = () => {
                                   </div>
                                   <div>
                                     <label className="text-sm font-medium text-yellow-600">Medium</label>
+                                    <span className="text-xs text-muted-foreground mx-1">Available: {chapterQuestionCounts[chapter.id]?.medium ?? 0}</span>
                                     <Input
                                       type="number"
                                       min="0"
+                                      max={chapterQuestionCounts[chapter.id]?.medium ?? 0}
                                       value={chapterRule.medium || ''}
                                       onChange={(e) => updateChapterRule(selectedSubjectName, chapter.name, 'medium', Number(e.target.value) || 0)}
                                       placeholder="0"
@@ -562,9 +652,11 @@ const CreateExam = () => {
                                   </div>
                                   <div>
                                     <label className="text-sm font-medium text-red-600">Hard</label>
+                                    <span className="text-xs text-muted-foreground mx-1">Available: {chapterQuestionCounts[chapter.id]?.hard ?? 0}</span>
                                     <Input
                                       type="number"
                                       min="0"
+                                      max={chapterQuestionCounts[chapter.id]?.hard ?? 0}
                                       value={chapterRule.hard || ''}
                                       onChange={(e) => updateChapterRule(selectedSubjectName, chapter.name, 'hard', Number(e.target.value) || 0)}
                                       placeholder="0"
@@ -592,9 +684,9 @@ const CreateExam = () => {
                 <div className="text-sm text-muted-foreground">
                   Total Questions: {getTotalQuestions()} • Duration: {formData.duration_minutes} minutes
                 </div>
-                <Button 
-                  type="submit" 
-                  onClick={mode === 'subject' ? handleSubjectSubmit : handleSubmit} 
+                <Button
+                  type="submit"
+                  onClick={mode === 'subject' ? handleSubjectSubmit : handleSubmit}
                   disabled={submitting || getTotalQuestions() === 0}
                 >
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
@@ -620,7 +712,7 @@ const CreateExam = () => {
                 <li>Perfect for balanced exams without chapter-specific requirements</li>
               </ul>
             </div>
-            
+
             <div>
               <p><strong>Advanced Mode (Chapter-level):</strong></p>
               <ul className="list-disc list-inside space-y-1 ml-4">
@@ -644,4 +736,4 @@ const CreateExam = () => {
   )
 }
 
-export default CreateExam
+export default CreateExam;
