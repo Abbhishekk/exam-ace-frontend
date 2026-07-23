@@ -30,7 +30,16 @@ const ExamAnalytics = () => {
   }
 
   if (loading) {
-    return <div className="p-6">Loading analytics...</div>
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600"></div>
+          <p className="text-lg font-medium text-gray-600 animate-pulse">
+            Loading analytics...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (!analytics || analytics.overview.total_students === 0) {
@@ -137,8 +146,8 @@ const ExamAnalytics = () => {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="w-16 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
                           style={{ width: `${stats.accuracy}%` }}
                         ></div>
                       </div>
@@ -177,8 +186,8 @@ const ExamAnalytics = () => {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="w-16 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-green-600 h-2 rounded-full" 
+                        <div
+                          className="bg-green-600 h-2 rounded-full"
                           style={{ width: `${stats.accuracy}%` }}
                         ></div>
                       </div>
