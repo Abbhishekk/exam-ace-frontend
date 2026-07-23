@@ -2,12 +2,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  GraduationCap, 
-  BookOpen, 
-  FileQuestion, 
-  ClipboardList, 
-  Users, 
+import {
+  GraduationCap,
+  BookOpen,
+  FileQuestion,
+  ClipboardList,
+  Users,
   Trophy,
   LogOut,
   Plus,
@@ -20,10 +20,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [statsvalue, setstatsvalue] = useState({totalStudents: 0,
+    totalQuestions: 0,
+    totalExams: 0,
+    averageScore: 0})
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -124,21 +130,85 @@ const AdminDashboard = () => {
     }
   ];
 
+  const fetchStats = async () => {
+    try {
+      const [
+        studentsResult,
+        questionsResult,
+        examsResult,
+        attemptsResult,
+      ] = await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("*", { count: "exact", head: true })
+          .eq("role", "student"),
+
+        supabase
+          .from("questions")
+          .select("*", { count: "exact", head: true }),
+
+        supabase
+          .from("exams")
+          .select("*", { count: "exact", head: true }),
+
+        supabase
+          .from("student_exam_attempts")
+          .select("score"),
+      ]);
+
+      if (
+        studentsResult.error ||
+        questionsResult.error ||
+        examsResult.error ||
+        attemptsResult.error
+      ) {
+        console.error(
+          studentsResult.error ||
+          questionsResult.error ||
+          examsResult.error ||
+          attemptsResult.error
+        );
+        return;
+      }
+
+      const scores = attemptsResult.data ?? [];
+
+      const averageScore =
+        scores.length > 0
+          ? scores.reduce((sum, item) => sum + (item.score ?? 0), 0) / scores.length
+          : 0;
+
+      setstatsvalue({
+        totalStudents: studentsResult.count ?? 0,
+        totalQuestions: questionsResult.count ?? 0,
+        totalExams: examsResult.count ?? 0,
+        averageScore: Number(averageScore.toFixed(2)),
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const stats = [
-    { label: "Total Students", value: "0", icon: Users },
-    { label: "Total Exams", value: "0", icon: ClipboardList },
-    { label: "Questions", value: "0", icon: FileQuestion },
-    { label: "Avg Score", value: "0%", icon: BarChart3 },
+    { label: "Total Students", value: statsvalue.totalStudents, icon: Users },
+    { label: "Total Exams", value: statsvalue.totalQuestions, icon: ClipboardList },
+    { label: "Questions", value: statsvalue.totalExams, icon: FileQuestion },
+    { label: "Avg Score", value: statsvalue.averageScore, icon: BarChart3 },
   ];
+
+
+  useEffect(() => {
+    fetchStats()
+  }, [])
 
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border p-6 hidden lg:block">
         <div className="flex items-center gap-3 mb-8">
-          <img 
-            src="/exam-ace-logo.jpeg" 
-            alt="Exam Ace Logo" 
+          <img
+            src="/exam-ace-logo.jpeg"
+            alt="Exam Ace Logo"
             className="w-10 h-10 rounded-lg"
           />
           <div>
@@ -154,11 +224,10 @@ const AdminDashboard = () => {
               <Link
                 key={index}
                 to={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  isActive 
-                    ? 'bg-sidebar-accent text-sidebar-foreground font-medium' 
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-                }`}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${isActive
+                  ? 'bg-sidebar-accent text-sidebar-foreground font-medium'
+                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                  }`}
               >
                 <item.icon className="w-5 h-5" />
                 <span className="text-sm">{item.title}</span>
@@ -168,8 +237,8 @@ const AdminDashboard = () => {
         </nav>
 
         <div className="absolute bottom-6 left-6 right-6">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground"
             onClick={handleLogout}
           >

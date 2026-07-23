@@ -3,11 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Eye, FileText, BarChart3, Calendar, Clock, Users, Download } from 'lucide-react'
+import { Plus, Eye, FileText, BarChart3, Calendar, Clock, Users, Download, ArrowLeft } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { generateQuestionPaper } from '@/lib/generateQuestionPaper'
+import { SelectGroup } from '@radix-ui/react-select'
 
 interface Exam {
   id: string
@@ -25,6 +26,9 @@ const ManageExams = () => {
   const navigate = useNavigate()
   const [exams, setExams] = useState<Exam[]>([])
   const [loading, setLoading] = useState(true)
+  const [pdfLoading, setPdfLoading] = useState<Record<string, boolean>>({});
+  const [resultLoading, setresultLoading] = useState<Record<string, boolean>>({});
+
 
   useEffect(() => {
     fetchExams()
@@ -47,18 +51,32 @@ const ManageExams = () => {
   }
 
   const handleGeneratePDF = async (examId: string) => {
+    setPdfLoading(prev => ({
+      ...prev,
+      [examId]: true,
+    }));
+
     try {
-      await generateQuestionPaper(examId)
-      toast.success('Question paper generated successfully')
+      await generateQuestionPaper(examId);
     } catch (error) {
-      toast.error('Failed to generate question paper')
+      toast.error('Failed to generate Question paper PDF')
+    } finally {
+      setPdfLoading(prev => ({
+        ...prev,
+        [examId]: false,
+      }));
     }
-  }
+  };
 
   const handleGenerateResultsPDF = async (examId: string) => {
+    setresultLoading(prev => ({
+      ...prev,
+      [examId]: true,
+    }));
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/generate-exam-results-pdf`, {
         method: 'POST',
         headers: {
@@ -69,7 +87,8 @@ const ManageExams = () => {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to generate results PDF')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate results PDF');
       }
 
       const blob = await response.blob()
@@ -81,10 +100,19 @@ const ManageExams = () => {
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
-      
+
       toast.success('Results PDF generated successfully')
     } catch (error) {
-      toast.error('Failed to generate results PDF')
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to generate results PDF'
+      );
+    } finally {
+      setresultLoading(prev => ({
+        ...prev,
+        [examId]: false,
+      }));
     }
   }
 
@@ -95,7 +123,7 @@ const ManageExams = () => {
   const getExamStatus = (startTime: string) => {
     const now = new Date()
     const start = new Date(startTime)
-    
+
     if (now < start) {
       return <Badge variant="outline">Upcoming</Badge>
     } else {
@@ -104,13 +132,28 @@ const ManageExams = () => {
   }
 
   if (loading) {
-    return <div className="p-6">Loading exams...</div>
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600"></div>
+          <p className="text-lg font-medium text-gray-600 animate-pulse">
+            Loading analytics...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
+          <Link to="/admin">
+            <Button variant="outline" className='mb-5' size="sm">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
           <h1 className="text-3xl font-bold">Manage Exams</h1>
           <p className="text-muted-foreground">Create and manage examination sessions</p>
         </div>
@@ -198,17 +241,22 @@ const ManageExams = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => handleGeneratePDF(exam.id)}
+                          disabled={pdfLoading[exam.id]}
+
                         >
                           <FileText className="w-4 h-4 mr-1" />
-                          PDF
+
+                          {pdfLoading[exam.id] ? <div className="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div> : "PDF"}
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleGenerateResultsPDF(exam.id)}
+                          disabled={resultLoading[exam.id]}
                         >
                           <Download className="w-4 h-4 mr-1" />
-                          Results
+                          {resultLoading[exam.id] ? <div className="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div> : "Results"}
+
                         </Button>
                         <Button
                           variant="outline"
