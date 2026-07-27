@@ -96,13 +96,19 @@ const ManageQuestions = () => {
   const [showPreview, setShowPreview] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
-  
+
+  const PAGE_SIZE = 10;
+  const [QuestionCount, setQuestionCount] = useState();
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   // Hierarchical selection state for form
   const [selectedClass, setSelectedClass] = useState('')
   const [selectedSubject, setSelectedSubject] = useState('')
   const [selectedChapter, setSelectedChapter] = useState('')
   const [selectedTopic, setSelectedTopic] = useState('')
-  
+
   // Filter state
   const [filters, setFilters] = useState<Filters>({
     classId: '',
@@ -111,7 +117,7 @@ const ManageQuestions = () => {
     topicId: '',
     searchText: ''
   })
-  
+
   const [formData, setFormData] = useState({
     question_text: '',
     option_a: '',
@@ -128,83 +134,52 @@ const ManageQuestions = () => {
   })
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    fetchMasterData();
+  }, []);
 
   // Filter logic for form dropdowns
   const formSubjects = useMemo(() => {
-    return selectedClass 
+    return selectedClass
       ? subjects.filter(s => s.class_id === selectedClass)
       : []
   }, [subjects, selectedClass])
 
   const formChapters = useMemo(() => {
-    return selectedSubject 
+    return selectedSubject
       ? chapters.filter(c => c.subject_id === selectedSubject)
       : []
   }, [chapters, selectedSubject])
 
   const formTopics = useMemo(() => {
-    return selectedChapter 
+    return selectedChapter
       ? topics.filter(t => t.chapter_id === selectedChapter)
       : []
   }, [topics, selectedChapter])
 
   // Filter logic for table filters
   const filteredSubjects = useMemo(() => {
-    return filters.classId 
+    return filters.classId
       ? subjects.filter(s => s.class_id === filters.classId)
       : subjects
   }, [subjects, filters.classId])
 
   const filteredChapters = useMemo(() => {
-    return filters.subjectId 
+    return filters.subjectId
       ? chapters.filter(c => c.subject_id === filters.subjectId)
       : chapters
   }, [chapters, filters.subjectId])
 
   const filteredTopics = useMemo(() => {
-    return filters.chapterId 
+    return filters.chapterId
       ? topics.filter(t => t.chapter_id === filters.chapterId)
       : topics
   }, [topics, filters.chapterId])
 
-  // Filtered questions
-  const filteredQuestions = useMemo(() => {
-    return questions.filter(question => {
-      // Class filter
-      if (filters.classId && question.topics?.chapters?.subjects?.classes?.name !== classes.find(c => c.id === filters.classId)?.name) {
-        return false
-      }
-      
-      // Subject filter
-      if (filters.subjectId && question.topics?.chapters?.subjects?.name !== subjects.find(s => s.id === filters.subjectId)?.name) {
-        return false
-      }
-      
-      // Chapter filter
-      if (filters.chapterId && question.topics?.chapters?.name !== chapters.find(c => c.id === filters.chapterId)?.name) {
-        return false
-      }
-      
-      // Topic filter
-      if (filters.topicId && question.topic_id !== filters.topicId) {
-        return false
-      }
-      
-      // Search filter
-      if (filters.searchText && !question.question_text.toLowerCase().includes(filters.searchText.toLowerCase())) {
-        return false
-      }
-      
-      return true
-    })
-  }, [questions, filters, classes, subjects, chapters])
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters(prev => {
       const newFilters = { ...prev, [key]: value === 'all' ? '' : value }
-      
+
       // Reset dependent filters
       if (key === 'classId') {
         newFilters.subjectId = ''
@@ -216,48 +191,48 @@ const ManageQuestions = () => {
       } else if (key === 'chapterId') {
         newFilters.topicId = ''
       }
-      
+
       return newFilters
     })
   }
 
   // Math rendering helper
-const renderMath = (content: string) => {
-  if (!content) return null
+  const renderMath = (content: string) => {
+    if (!content) return null
 
-  // Split by block math first ($$...$$)
-  const blockSplit = content.split(/(\$\$[\s\S]*?\$\$)/g)
+    // Split by block math first ($$...$$)
+    const blockSplit = content.split(/(\$\$[\s\S]*?\$\$)/g)
 
-  return blockSplit.map((block, blockIndex) => {
-    // Block math
-    if (block.startsWith("$$") && block.endsWith("$$")) {
-      return (
-        <BlockMath key={blockIndex}>
-          {block.slice(2, -2)}
-        </BlockMath>
-      )
-    }
-
-    // Split remaining text by inline math ($...$)
-    const inlineSplit = block.split(/(\$[^$]+\$)/g)
-
-    return inlineSplit.map((inline, inlineIndex) => {
-      if (inline.startsWith("$") && inline.endsWith("$")) {
+    return blockSplit.map((block, blockIndex) => {
+      // Block math
+      if (block.startsWith("$$") && block.endsWith("$$")) {
         return (
-          <InlineMath key={`${blockIndex}-${inlineIndex}`}>
-            {inline.slice(1, -1)}
-          </InlineMath>
+          <BlockMath key={blockIndex}>
+            {block.slice(2, -2)}
+          </BlockMath>
         )
       }
 
-      return (
-        <span key={`${blockIndex}-${inlineIndex}`}>
-          {inline}
-        </span>
-      )
+      // Split remaining text by inline math ($...$)
+      const inlineSplit = block.split(/(\$[^$]+\$)/g)
+
+      return inlineSplit.map((inline, inlineIndex) => {
+        if (inline.startsWith("$") && inline.endsWith("$")) {
+          return (
+            <InlineMath key={`${blockIndex}-${inlineIndex}`}>
+              {inline.slice(1, -1)}
+            </InlineMath>
+          )
+        }
+
+        return (
+          <span key={`${blockIndex}-${inlineIndex}`}>
+            {inline}
+          </span>
+        )
+      })
     })
-  })
-}
+  }
 
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'question' | 'explanation' = 'question') => {
@@ -276,10 +251,10 @@ const renderMath = (content: string) => {
 
     const setUploading = type === 'question' ? setUploadingImage : setUploadingExplanationImage
     setUploading(true)
-    
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (!session) {
         toast.error('Session expired. Please login again.')
         return
@@ -302,7 +277,7 @@ const renderMath = (content: string) => {
       }
 
       const data = await response.json()
-      
+
       if (type === 'question') {
         setFormData(prev => ({ ...prev, image_url: data.imageUrl }))
         setImagePreview(data.imageUrl)
@@ -310,7 +285,7 @@ const renderMath = (content: string) => {
         setFormData(prev => ({ ...prev, explanation_image_url: data.imageUrl }))
         setExplanationImagePreview(data.imageUrl)
       }
-      
+
       toast.success(`${type === 'question' ? 'Question' : 'Explanation'} image uploaded successfully`)
     } catch (error) {
       toast.error('Failed to upload image: ' + error.message)
@@ -329,7 +304,8 @@ const renderMath = (content: string) => {
     }
   }
 
-  const fetchData = async () => {
+  const fetchMasterData = async () => {
+    setLoadingMore(true)
     try {
       // Fetch classes
       const { data: classesData, error: classesError } = await supabase
@@ -378,39 +354,6 @@ const renderMath = (content: string) => {
       if (topicsError) throw topicsError
       setTopics(topicsData as Topic[] || [])
 
-      // Fetch questions with topic hierarchy
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('questions')
-        .select(`
-          id,
-          question_text,
-          image_url,
-          option_a,
-          option_b,
-          option_c,
-          option_d,
-          correct_option,
-          marks,
-          negative_marks,
-          difficulty,
-          explanation,
-          topic_id,
-          created_at,
-          topics(
-            name,
-            chapters(
-              name,
-              subjects(
-                name,
-                classes(name)
-              )
-            )
-          )
-        `)
-        .order('created_at', { ascending: false })
-
-      if (questionsError) throw questionsError
-      setQuestions(questionsData as Question[] || [])
     } catch (error) {
       toast.error('Failed to fetch data: ' + error.message)
     } finally {
@@ -418,11 +361,149 @@ const renderMath = (content: string) => {
     }
   }
 
+  const fetchQuestions = async (
+    pageNumber = 0,
+    append = false
+  ) => {
+    try {
+      setLoadingMore(true);
+
+      let topicIds: string[] = [];
+
+      // ----------------------------
+      // Find topic ids from filters
+      // ----------------------------
+
+      if (filters.topicId) {
+        topicIds = [filters.topicId];
+      } else if (filters.chapterId) {
+        topicIds = topics
+          .filter(t => t.chapter_id === filters.chapterId)
+          .map(t => t.id);
+      } else if (filters.subjectId) {
+        const chapterIds = chapters
+          .filter(c => c.subject_id === filters.subjectId)
+          .map(c => c.id);
+
+        topicIds = topics
+          .filter(t => chapterIds.includes(t.chapter_id))
+          .map(t => t.id);
+      } else if (filters.classId) {
+        const subjectIds = subjects
+          .filter(s => s.class_id === filters.classId)
+          .map(s => s.id);
+
+        const chapterIds = chapters
+          .filter(c => subjectIds.includes(c.subject_id))
+          .map(c => c.id);
+
+        topicIds = topics
+          .filter(t => chapterIds.includes(t.chapter_id))
+          .map(t => t.id);
+      }
+
+      //---------------------------------------
+      // Build Question Query
+      //---------------------------------------
+
+      let query = supabase
+        .from("questions")
+        .select(
+          `
+        id,
+        question_text,
+        image_url,
+        option_a,
+        option_b,
+        option_c,
+        option_d,
+        correct_option,
+        marks,
+        negative_marks,
+        difficulty,
+        explanation,
+        topic_id,
+        created_at,
+        topics(
+          id,
+          name,
+          chapter_id,
+          chapters(
+            id,
+            name,
+            subject_id,
+            subjects(
+              id,
+              name,
+              class_id,
+              classes(
+                id,
+                name
+              )
+            )
+          )
+        )
+      `,
+          { count: "exact" }
+        );
+
+      //---------------------------------------
+      // Apply Filters
+      //---------------------------------------
+
+      if (topicIds.length > 0) {
+        query = query.in("topic_id", topicIds);
+      }
+
+      if (filters.searchText) {
+        query = query.ilike(
+          "question_text",
+          `%${filters.searchText}%`
+        );
+      }
+
+      //---------------------------------------
+      // Pagination
+      //---------------------------------------
+
+      const { data, count, error } = await query
+        .order("created_at", { ascending: false })
+        .range(
+          pageNumber * PAGE_SIZE,
+          (pageNumber + 1) * PAGE_SIZE - 1
+        );
+
+      if (error) throw error;
+
+      if (append) {
+        setQuestions(prev => [...prev, ...(data || [])]);
+      } else {
+        setQuestions(data || []);
+      }
+
+      setQuestionCount(count || 0);
+
+      setPage(pageNumber);
+
+      setHasMore(
+        (pageNumber + 1) * PAGE_SIZE < (count || 0)
+      );
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const loadMoreQuestions = () => {
+    fetchQuestions(page + 1, true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedTopic || !formData.question_text.trim() || !formData.option_a.trim() || 
-        !formData.option_b.trim() || !formData.option_c.trim() || !formData.option_d.trim() || 
-        !formData.correct_option || !formData.difficulty) {
+    if (!selectedTopic || !formData.question_text.trim() || !formData.option_a.trim() ||
+      !formData.option_b.trim() || !formData.option_c.trim() || !formData.option_d.trim() ||
+      !formData.correct_option || !formData.difficulty) {
       toast.error('All fields except explanation and images are required')
       return
     }
@@ -430,7 +511,7 @@ const renderMath = (content: string) => {
     setSubmitting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (!session) {
         toast.error('Session expired. Please login again.')
         return
@@ -462,7 +543,7 @@ const renderMath = (content: string) => {
         const error = await response.json()
         throw new Error(error.error || 'Failed to create question')
       }
-      
+
       toast.success('Question added successfully')
       // Only reset form fields, keep selections
       setFormData({
@@ -511,9 +592,9 @@ const renderMath = (content: string) => {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editingQuestion || !formData.question_text.trim() || !formData.option_a.trim() || 
-        !formData.option_b.trim() || !formData.option_c.trim() || !formData.option_d.trim() || 
-        !formData.correct_option || !formData.difficulty) {
+    if (!editingQuestion || !formData.question_text.trim() || !formData.option_a.trim() ||
+      !formData.option_b.trim() || !formData.option_c.trim() || !formData.option_d.trim() ||
+      !formData.correct_option || !formData.difficulty) {
       toast.error('All fields except explanation and images are required')
       return
     }
@@ -521,7 +602,7 @@ const renderMath = (content: string) => {
     setEditing(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (!session) {
         toast.error('Session expired. Please login again.')
         return
@@ -552,7 +633,7 @@ const renderMath = (content: string) => {
         const error = await response.json()
         throw new Error(error.error || 'Failed to update question')
       }
-      
+
       toast.success('Question updated successfully')
       setEditModalOpen(false)
       setEditingQuestion(null)
@@ -574,13 +655,24 @@ const renderMath = (content: string) => {
         .eq('id', id)
 
       if (error) throw error
-      
+
       toast.success('Question deleted successfully')
       fetchData()
     } catch (error) {
       toast.error('Failed to delete question: ' + error.message)
     }
   }
+
+  useEffect(() => {
+    if (
+      classes.length &&
+      subjects.length &&
+      chapters.length &&
+      topics.length
+    ) {
+      fetchQuestions(0, false);
+    }
+  }, [classes, subjects, chapters, topics, filters]);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -1018,14 +1110,14 @@ const renderMath = (content: string) => {
         {/* Questions Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Questions ({filteredQuestions.length})</CardTitle>
+            <CardTitle>Questions ({QuestionCount})</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin" />
               </div>
-            ) : filteredQuestions.length === 0 ? (
+            ) : questions.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 {questions.length === 0 ? 'No questions found. Add your first question above.' : 'No questions match the current filters.'}
               </div>
@@ -1045,7 +1137,7 @@ const renderMath = (content: string) => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredQuestions.map((question) => (
+                    {questions.map((question) => (
                       <TableRow key={question.id}>
                         <TableCell className="text-sm">
                           {question.topics.chapters.subjects.classes.name} - {question.topics.name}
@@ -1076,11 +1168,10 @@ const renderMath = (content: string) => {
                         <TableCell className="font-medium">{question.correct_option}</TableCell>
                         <TableCell>{question.marks} / -{question.negative_marks}</TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            question.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+                          <span className={`px-2 py-1 rounded text-xs ${question.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
                             question.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
+                              'bg-red-100 text-red-800'
+                            }`}>
                             {question.difficulty}
                           </span>
                         </TableCell>
@@ -1103,18 +1194,37 @@ const renderMath = (content: string) => {
                           </div>
                         </TableCell>
                       </TableRow>
+
                     ))}
                   </TableBody>
                 </Table>
               </div>
+
             )}
           </CardContent>
         </Card>
+        <div className="flex justify-center mt-6">
+          {hasMore && (
+            <Button
+              onClick={loadMoreQuestions}
+              disabled={loadingMore}
+            >
+              {loadingMore ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Load More"
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Image Modal */}
       {modalImage && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
           onClick={() => setModalImage(null)}
         >
@@ -1140,7 +1250,7 @@ const renderMath = (content: string) => {
           <DialogHeader>
             <DialogTitle>Edit Question</DialogTitle>
           </DialogHeader>
-          
+
           {editingQuestion && (
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div className="text-sm text-muted-foreground mb-4">

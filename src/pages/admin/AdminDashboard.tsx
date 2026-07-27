@@ -191,8 +191,8 @@ const AdminDashboard = () => {
 
   const stats = [
     { label: "Total Students", value: statsvalue.totalStudents, icon: Users },
-    { label: "Total Exams", value: statsvalue.totalQuestions, icon: ClipboardList },
-    { label: "Questions", value: statsvalue.totalExams, icon: FileQuestion },
+    { label: "Total Exams", value: statsvalue.totalExams, icon: ClipboardList },
+    { label: "Questions", value: statsvalue.totalQuestions, icon: FileQuestion },
     { label: "Avg Score", value: statsvalue.averageScore, icon: BarChart3 },
   ];
 
