@@ -100,13 +100,13 @@ const AdminDashboard = () => {
       href: "/admin/exams/create",
       color: "bg-warning/10 text-warning"
     },
-    {
-      title: "Rule-Based Exam",
-      description: "Auto-generate exams using rules",
-      icon: Wand2,
-      href: "/admin/exams/rule-based",
-      color: "bg-orange-100 text-orange-600"
-    },
+    // {
+    //   title: "Rule-Based Exam",
+    //   description: "Auto-generate exams using rules",
+    //   icon: Wand2,
+    //   href: "/admin/exams/rule-based",
+    //   color: "bg-orange-100 text-orange-600"
+    // },
     {
       title: "Multi-subject Exam",
       description: "Auto-generate multi-subject exams using rules",
