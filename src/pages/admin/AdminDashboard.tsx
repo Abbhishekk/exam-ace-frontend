@@ -100,13 +100,13 @@ const AdminDashboard = () => {
       href: "/admin/exams/create",
       color: "bg-warning/10 text-warning"
     },
-    {
-      title: "Rule-Based Exam",
-      description: "Auto-generate exams using rules",
-      icon: Wand2,
-      href: "/admin/exams/rule-based",
-      color: "bg-orange-100 text-orange-600"
-    },
+    // {
+    //   title: "Rule-Based Exam",
+    //   description: "Auto-generate exams using rules",
+    //   icon: Wand2,
+    //   href: "/admin/exams/rule-based",
+    //   color: "bg-orange-100 text-orange-600"
+    // },
     {
       title: "Multi-subject Exam",
       description: "Auto-generate multi-subject exams using rules",
@@ -191,8 +191,8 @@ const AdminDashboard = () => {
 
   const stats = [
     { label: "Total Students", value: statsvalue.totalStudents, icon: Users },
-    { label: "Total Exams", value: statsvalue.totalQuestions, icon: ClipboardList },
-    { label: "Questions", value: statsvalue.totalExams, icon: FileQuestion },
+    { label: "Total Exams", value: statsvalue.totalExams, icon: ClipboardList },
+    { label: "Questions", value: statsvalue.totalQuestions, icon: FileQuestion },
     { label: "Avg Score", value: statsvalue.averageScore, icon: BarChart3 },
   ];
 
