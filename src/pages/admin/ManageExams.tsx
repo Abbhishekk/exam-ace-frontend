@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Eye, FileText, BarChart3, Calendar, Clock, Users, Download, ArrowLeft } from 'lucide-react'
+import { Plus, Eye, FileText, BarChart3, Calendar, Clock, Users, Download, ArrowLeft, Copy } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -265,6 +265,16 @@ const ManageExams = () => {
                         >
                           <BarChart3 className="w-4 h-4 mr-1" />
                           Analytics
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/admin/exams/multi-subject?cloneExamId=${exam.id}`)}
+                          className="text-primary hover:text-primary hover:bg-primary/5"
+                          title="Create a new exam with this exam's exact chapter and difficulty configuration"
+                        >
+                          <Copy className="w-4 h-4 mr-1" />
+                          Clone
                         </Button>
                       </div>
                     </TableCell>

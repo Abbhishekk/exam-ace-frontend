@@ -3,12 +3,27 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import { Loader2, ArrowLeft, Plus, X, BookOpen, ChevronDown, ChevronRight, Zap, Settings, ChevronsUpDown } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { 
+  Loader2, 
+  ArrowLeft, 
+  Plus, 
+  X, 
+  BookOpen, 
+  ChevronDown, 
+  ChevronRight, 
+  Zap, 
+  Settings, 
+  Copy, 
+  Sparkles, 
+  CheckCircle2, 
+  RefreshCw 
+} from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { API_BASE_URL } from '@/lib/envs'
 
 interface Class {
@@ -68,13 +83,32 @@ interface ExamSection {
   expanded_chapters: string[]
 }
 
+interface PreviousExamItem {
+  id: string
+  name: string
+  code: string
+  total_questions: number
+  duration_minutes: number
+  created_at: string
+}
+
 const CreateMultiSubjectExam = () => {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const cloneExamIdParam = searchParams.get('cloneExamId')
+
   const [classes, setClasses] = useState<Class[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [selectedClass, setSelectedClass] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+
+  // Previous exams for cloning
+  const [previousExams, setPreviousExams] = useState<PreviousExamItem[]>([])
+  const [loadingPreviousExams, setLoadingPreviousExams] = useState(false)
+  const [selectedCloneExamId, setSelectedCloneExamId] = useState<string>('')
+  const [cloningLoading, setCloningLoading] = useState(false)
+  const [clonedFromExamName, setClonedFromExamName] = useState<string>('')
   
   const [formData, setFormData] = useState({
     name: '',
@@ -87,7 +121,15 @@ const CreateMultiSubjectExam = () => {
 
   useEffect(() => {
     fetchClasses()
+    fetchPreviousExams()
   }, [])
+
+  useEffect(() => {
+    if (cloneExamIdParam) {
+      setSelectedCloneExamId(cloneExamIdParam)
+      loadExamConfig(cloneExamIdParam)
+    }
+  }, [cloneExamIdParam])
 
   useEffect(() => {
     if (selectedClass) {
@@ -114,6 +156,42 @@ const CreateMultiSubjectExam = () => {
     }
   }
 
+  const fetchPreviousExams = async () => {
+    setLoadingPreviousExams(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      const response = await fetch(`${API_BASE_URL}/api/admin/exams-list`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.exams)) {
+          setPreviousExams(result.exams)
+          return
+        }
+      }
+
+      // Fallback directly to Supabase client
+      const { data, error } = await supabase
+        .from('exams')
+        .select('id, name, code, total_questions, duration_minutes, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100)
+
+      if (!error && data) {
+        setPreviousExams(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch previous exams list:', err)
+    } finally {
+      setLoadingPreviousExams(false)
+    }
+  }
+
   const fetchSubjects = async (classId: string) => {
     try {
       const { data, error } = await supabase
@@ -124,13 +202,14 @@ const CreateMultiSubjectExam = () => {
 
       if (error) throw error
       setSubjects(data || [])
+      return data || []
     } catch (error: any) {
       toast.error('Failed to fetch subjects: ' + error.message)
+      return []
     }
   }
 
-  const fetchQuestionCounts = async (subjectId: string, sectionIndex: number) => {
-    setSections(prev => prev.map((s, idx) => idx === sectionIndex ? { ...s, loading_counts: true } : s))
+  const fetchSubjectCountsAsync = async (subjectId: string): Promise<QuestionCounts> => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       
@@ -140,26 +219,19 @@ const CreateMultiSubjectExam = () => {
         }
       })
 
-      if (!response.ok) throw new Error('Failed to fetch question counts')
-
-      const result = await response.json()
-      
-      setSections(prev => prev.map((section, index) => 
-        index === sectionIndex 
-          ? { ...section, available_counts: result.counts, loading_counts: false }
-          : section
-      ))
-    } catch (error: any) {
-      console.error('Failed to fetch question counts:', error)
-      setSections(prev => prev.map((s, idx) => idx === sectionIndex ? { ...s, loading_counts: false } : s))
+      if (response.ok) {
+        const result = await response.json()
+        if (result.counts) return result.counts
+      }
+    } catch (err) {
+      console.warn('Failed to fetch subject question counts from API', err)
     }
+    return { easy: 0, medium: 0, hard: 0 }
   }
 
-  const fetchSectionChapters = async (subjectId: string, sectionIndex: number) => {
-    setSections(prev => prev.map((s, idx) => idx === sectionIndex ? { ...s, loading_chapters: true } : s))
+  const fetchSubjectChaptersAsync = async (subjectId: string): Promise<ChapterItem[]> => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      let chapterList: ChapterItem[] = []
 
       // 1. Try server endpoint first
       try {
@@ -171,75 +243,186 @@ const CreateMultiSubjectExam = () => {
         if (response.ok) {
           const result = await response.json()
           if (result.success && Array.isArray(result.chapters)) {
-            chapterList = result.chapters
+            return result.chapters
           }
         }
       } catch (err) {
         console.warn('API fetch chapters failed, trying Supabase client directly', err)
       }
 
-      // 2. Fallback to Supabase client query if needed
-      if (chapterList.length === 0) {
-        const { data, error } = await supabase
-          .from('subjects')
-          .select(`
+      // 2. Fallback to Supabase client query
+      const { data, error } = await supabase
+        .from('subjects')
+        .select(`
+          id,
+          chapters (
             id,
-            chapters (
+            name,
+            topics (
               id,
               name,
-              topics (
+              questions (
                 id,
-                name,
-                questions (
-                  id,
-                  difficulty
-                )
+                difficulty
               )
             )
-          `)
-          .eq('id', subjectId)
-          .single()
+          )
+        `)
+        .eq('id', subjectId)
+        .single()
 
-        if (!error && data?.chapters) {
-          chapterList = data.chapters.map((ch: any) => {
-            let easy = 0
-            let medium = 0
-            let hard = 0
-            ch.topics?.forEach((t: any) => {
-              t.questions?.forEach((q: any) => {
-                if (q.difficulty === 'easy') easy++
-                else if (q.difficulty === 'medium') medium++
-                else if (q.difficulty === 'hard') hard++
-              })
+      if (!error && data?.chapters) {
+        return data.chapters.map((ch: any) => {
+          let easy = 0
+          let medium = 0
+          let hard = 0
+          ch.topics?.forEach((t: any) => {
+            t.questions?.forEach((q: any) => {
+              if (q.difficulty === 'easy') easy++
+              else if (q.difficulty === 'medium') medium++
+              else if (q.difficulty === 'hard') hard++
             })
-            return {
-              id: ch.id,
-              name: ch.name,
-              counts: {
-                easy,
-                medium,
-                hard,
-                total: easy + medium + hard
-              }
+          })
+          return {
+            id: ch.id,
+            name: ch.name,
+            counts: {
+              easy,
+              medium,
+              hard,
+              total: easy + medium + hard
+            }
+          }
+        })
+      }
+    } catch (err) {
+      console.error('Error fetching subject chapters:', err)
+    }
+    return []
+  }
+
+  const fetchQuestionCounts = async (subjectId: string, sectionIndex: number) => {
+    setSections(prev => prev.map((s, idx) => idx === sectionIndex ? { ...s, loading_counts: true } : s))
+    const counts = await fetchSubjectCountsAsync(subjectId)
+    setSections(prev => prev.map((section, index) => 
+      index === sectionIndex 
+        ? { ...section, available_counts: counts, loading_counts: false }
+        : section
+    ))
+  }
+
+  const fetchSectionChapters = async (subjectId: string, sectionIndex: number) => {
+    setSections(prev => prev.map((s, idx) => idx === sectionIndex ? { ...s, loading_chapters: true } : s))
+    const chapterList = await fetchSubjectChaptersAsync(subjectId)
+    setSections(prev => prev.map((section, index) => 
+      index === sectionIndex 
+        ? { ...section, chapters: chapterList, loading_chapters: false }
+        : section
+    ))
+  }
+
+  const loadExamConfig = async (examId: string) => {
+    if (!examId) return
+    setCloningLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      const response = await fetch(`${API_BASE_URL}/api/admin/exams/${examId}/config`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to fetch exam configuration')
+      }
+
+      const { config } = await response.json()
+
+      // 1. Set Class and fetch subjects
+      if (config.class_id) {
+        setSelectedClass(config.class_id)
+        await fetchSubjects(config.class_id)
+      }
+
+      // 2. Set basic form details
+      const randomSuffix = Math.floor(100 + Math.random() * 900)
+      setFormData(prev => ({
+        ...prev,
+        name: config.name ? `${config.name} (Copy)` : '',
+        code: config.code ? `${config.code}-${randomSuffix}` : '',
+        duration_minutes: config.duration_minutes || 180
+      }))
+
+      // 3. Reconstruct sections and chapters
+      const builtSections: ExamSection[] = []
+
+      for (const secConfig of (config.sections || [])) {
+        const chapterList = await fetchSubjectChaptersAsync(secConfig.subject_id)
+        const counts = await fetchSubjectCountsAsync(secConfig.subject_id)
+
+        const rulesMap: { [chapterId: string]: ChapterRule } = {}
+        const expandedChapterIds: string[] = []
+
+        if (Array.isArray(secConfig.chapter_rules)) {
+          secConfig.chapter_rules.forEach((cr: any) => {
+            const easy = cr.difficulty_distribution?.easy || cr.easy || 0
+            const medium = cr.difficulty_distribution?.medium || cr.medium || 0
+            const hard = cr.difficulty_distribution?.hard || cr.hard || 0
+
+            rulesMap[cr.chapter_id] = { easy, medium, hard }
+
+            if (easy > 0 || medium > 0 || hard > 0) {
+              expandedChapterIds.push(cr.chapter_id)
             }
           })
         }
+
+        builtSections.push({
+          subject_id: secConfig.subject_id,
+          section_name: secConfig.section_name,
+          mode: secConfig.mode || 'chapter',
+          difficulty_distribution: secConfig.difficulty_distribution || { easy: 0, medium: 0, hard: 0 },
+          available_counts: counts,
+          chapters: chapterList,
+          chapter_rules: rulesMap,
+          expanded_chapters: expandedChapterIds,
+          loading_chapters: false,
+          loading_counts: false
+        })
       }
 
-      setSections(prev => prev.map((section, index) => 
-        index === sectionIndex 
-          ? { 
-              ...section, 
-              chapters: chapterList, 
-              loading_chapters: false 
-            }
-          : section
-      ))
+      setSections(builtSections)
+      setClonedFromExamName(config.name || 'Previous Exam')
+
+      const totalQ = builtSections.reduce((acc, s) => {
+        return acc + Object.values(s.chapter_rules).reduce((cAcc, r) => cAcc + r.easy + r.medium + r.hard, 0)
+      }, 0)
+
+      toast.success(`Loaded configuration from "${config.name}" (${totalQ} questions across ${builtSections.length} sections)!`)
     } catch (error: any) {
-      console.error('Failed to fetch chapters:', error)
-      toast.error('Failed to fetch chapters: ' + error.message)
-      setSections(prev => prev.map((s, idx) => idx === sectionIndex ? { ...s, loading_chapters: false } : s))
+      console.error('Failed to load exam configuration:', error)
+      toast.error('Failed to load exam configuration: ' + error.message)
+    } finally {
+      setCloningLoading(false)
     }
+  }
+
+  const handleResetClonedConfig = () => {
+    setSelectedCloneExamId('')
+    setClonedFromExamName('')
+    setFormData({
+      name: '',
+      code: '',
+      start_time: '',
+      duration_minutes: 180
+    })
+    setSections([])
+    if (cloneExamIdParam) {
+      setSearchParams({})
+    }
+    toast.info('Form cleared to blank')
   }
 
   const addSection = () => {
@@ -372,7 +555,7 @@ const CreateMultiSubjectExam = () => {
     e.preventDefault()
     
     if (!formData.name.trim() || !formData.code.trim() || !formData.start_time) {
-      toast.error('All exam fields are required')
+      toast.error('All exam fields are required (Name, Code, Start Time)')
       return
     }
 
@@ -474,7 +657,7 @@ const CreateMultiSubjectExam = () => {
 
       const result = await response.json()
       toast.success(`Multi-subject exam created! ${result.total_questions} questions across ${result.sections_created} sections.`)
-      navigate('/admin')
+      navigate('/admin/exams')
     } catch (error: any) {
       toast.error('Failed to create exam: ' + error.message)
     } finally {
@@ -484,9 +667,9 @@ const CreateMultiSubjectExam = () => {
 
   return (
     <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4">
           <Link to="/admin">
             <Button variant="outline" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -496,13 +679,93 @@ const CreateMultiSubjectExam = () => {
           <div>
             <h1 className="text-3xl font-bold">Create Multi-Subject Exam</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Configure sections with chapter-level and difficulty-level question selection
+              Create an exam with custom chapter and difficulty rules or clone an exact previous configuration
             </p>
           </div>
         </div>
 
-        {/* Exam Details */}
-        <Card className="mb-6 shadow-sm">
+        {/* Clone / Reuse Previous Exam Config Card */}
+        <Card className="border-primary/30 bg-primary/[0.02] shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                <CardTitle className="text-base font-semibold">
+                  Reuse Previous Exam Configuration
+                </CardTitle>
+              </div>
+              {clonedFromExamName && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="flex items-center gap-1.5 py-1 px-2.5 text-xs bg-primary/10 text-primary border-primary/20">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Config Loaded: {clonedFromExamName}
+                  </Badge>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleResetClonedConfig} 
+                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Reset Form
+                  </Button>
+                </div>
+              )}
+            </div>
+            <CardDescription className="text-xs">
+              Select any past exam to automatically copy its exact class, subjects, chapters, and difficulty distribution. New least-used questions will be selected.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="flex-1">
+                <Select 
+                  value={selectedCloneExamId} 
+                  onValueChange={(val) => {
+                    setSelectedCloneExamId(val)
+                    loadExamConfig(val)
+                  }}
+                  disabled={loadingPreviousExams || cloningLoading}
+                >
+                  <SelectTrigger className="w-full bg-background">
+                    <SelectValue placeholder={loadingPreviousExams ? "Loading previous exams..." : "Select a previous exam to clone configuration..."} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {previousExams.map(ex => (
+                      <SelectItem key={ex.id} value={ex.id}>
+                        <span className="font-medium">{ex.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ({ex.code}) • {ex.total_questions} questions • {ex.duration_minutes}m
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => selectedCloneExamId && loadExamConfig(selectedCloneExamId)}
+                disabled={!selectedCloneExamId || cloningLoading}
+                className="shrink-0"
+              >
+                {cloningLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading Config...
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Apply Config
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Exam Details Form */}
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Exam Details</CardTitle>
           </CardHeader>
@@ -554,7 +817,7 @@ const CreateMultiSubjectExam = () => {
         </Card>
 
         {/* Class Selection */}
-        <Card className="mb-6 shadow-sm">
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Class Selection</CardTitle>
           </CardHeader>
@@ -582,7 +845,7 @@ const CreateMultiSubjectExam = () => {
 
         {/* Sections */}
         {selectedClass && (
-          <Card className="mb-6 shadow-sm">
+          <Card className="shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -602,7 +865,7 @@ const CreateMultiSubjectExam = () => {
                 <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/20">
                   <BookOpen className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                   <p className="text-sm font-medium text-muted-foreground">No sections added yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Click "Add Section" above to add your first subject section</p>
+                  <p className="text-xs text-muted-foreground mt-1">Click "Add Section" above or load from a previous exam</p>
                   <Button onClick={addSection} size="sm" variant="outline" className="mt-4">
                     <Plus className="w-4 h-4 mr-1.5" />
                     Add Section
@@ -692,7 +955,7 @@ const CreateMultiSubjectExam = () => {
                                 {section.loading_chapters ? (
                                   <div className="flex justify-center items-center py-8 text-muted-foreground text-sm gap-2">
                                     <Loader2 className="w-5 h-5 animate-spin" />
-                                    Loading chapters and questions...
+                                    Loading chapters and question counts...
                                   </div>
                                 ) : section.chapters && section.chapters.length > 0 ? (
                                   <div className="space-y-3">
@@ -941,7 +1204,7 @@ const CreateMultiSubjectExam = () => {
 
         {/* Summary and Submit */}
         {getTotalQuestions() > 0 && (
-          <Card className="mb-6 shadow-sm border-primary/30 bg-primary/[0.02]">
+          <Card className="shadow-sm border-primary/30 bg-primary/[0.02]">
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
@@ -975,6 +1238,7 @@ const CreateMultiSubjectExam = () => {
           <CardContent className="text-sm text-muted-foreground space-y-2">
             <p><strong>Features:</strong></p>
             <ul className="list-disc list-inside space-y-1 ml-4 text-xs sm:text-sm">
+              <li><strong>Reuse Configuration:</strong> Clone the exact chapter and difficulty configuration from any previously created exam with one click.</li>
               <li><strong>Advanced Mode (Chapter-level):</strong> Select exactly how many Easy, Medium, and Hard questions come from each specific chapter.</li>
               <li><strong>Quick Mode (Subject-level):</strong> Specify overall difficulty distribution across the entire subject.</li>
               <li><strong>Usage-Aware Selection:</strong> Questions that have been least used in past exams are prioritized to ensure balanced question rotation.</li>
