@@ -12,10 +12,15 @@ import { Link, useNavigate } from 'react-router-dom'
 interface Question {
   id: string
   question_text: string
+  image_url: string
   option_a: string
+  option_a_image_url: string,
   option_b: string
+  option_b_image_url: string,
   option_c: string
+  option_c_image_url: string,
   option_d: string
+  option_d_image_url: string,
   correct_option: string
   marks: number
   negative_marks: number
@@ -58,9 +63,13 @@ const CreateExam = () => {
           question_text,
           image_url,
           option_a,
+          option_a_image_url,
           option_b,
+          option_b_image_url,
           option_c,
+          option_c_image_url,
           option_d,
+          option_d_image_url,
           correct_option,
           marks,
           negative_marks,
@@ -107,7 +116,7 @@ const CreateExam = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.name.trim() || !formData.code.trim() || !formData.start_time || selectedQuestions.size === 0) {
       toast.error('All fields are required and at least one question must be selected')
       return
@@ -142,18 +151,22 @@ const CreateExam = () => {
         .select()
         .single()
 
-      if (examError) throw examError
+      if (examError) return examError
 
       // Step 2: Create question snapshots in exam_questions
       const selectedQuestionsData = questions.filter(q => selectedQuestions.has(q.id))
       const examQuestions = selectedQuestionsData.map((question, index) => ({
         exam_id: examData.id,
         question_text: question.question_text,
-        image_url: question.image_url,
+        image_url: question.image_url || null,
         option_a: question.option_a,
+        option_a_image_url: question.option_a_image_url || null,
         option_b: question.option_b,
+        option_b_image_url: question.option_b_image_url || null,
         option_c: question.option_c,
+        option_c_image_url: question.option_c_image_url || null,
         option_d: question.option_d,
+        option_d_image_url: question.option_d_image_url || null,
         correct_option: question.correct_option,
         marks: question.marks,
         negative_marks: question.negative_marks,
@@ -215,13 +228,13 @@ const CreateExam = () => {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
-              
+
               <Input
                 placeholder="Exam code"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               />
-              
+
               <Input
                 type="datetime-local"
                 value={formData.start_time ? new Date(formData.start_time).toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).slice(0, 16) : ''}
@@ -233,7 +246,7 @@ const CreateExam = () => {
                 }}
               />
               <span className="text-xs text-muted-foreground mt-1">Time in IST</span>
-              
+
               <div className="flex gap-2">
                 <Input
                   type="number"
@@ -320,11 +333,10 @@ const CreateExam = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            question.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+                          <span className={`px-2 py-1 rounded text-xs ${question.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
                             question.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
+                              'bg-red-100 text-red-800'
+                            }`}>
                             {question.difficulty}
                           </span>
                         </TableCell>

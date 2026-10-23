@@ -21,6 +21,7 @@ interface Question {
   options: Array<{
     key: string
     text: string
+    image_url?: string | null
   }>
 }
 
@@ -122,10 +123,10 @@ const StudentExam = () => {
     const handleSelectStart = (e: Event) => e.preventDefault()
     const handleKeyDown = (e: KeyboardEvent) => {
       // Disable F12, Ctrl+Shift+I, Ctrl+U, Ctrl+C, Ctrl+V
-      if (e.key === 'F12' || 
-          (e.ctrlKey && e.shiftKey && e.key === 'I') ||
-          (e.ctrlKey && e.key === 'u') ||
-          (e.ctrlKey && (e.key === 'c' || e.key === 'v'))) {
+      if (e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+        (e.ctrlKey && e.key === 'u') ||
+        (e.ctrlKey && (e.key === 'c' || e.key === 'v'))) {
         e.preventDefault()
         toast.error('This action is disabled during the exam')
       }
@@ -195,24 +196,24 @@ const StudentExam = () => {
 
   const submitExam = async () => {
     if (submitting) return
-    
+
     // Show confirmation alert
     const answeredQuestions = Object.values(answers).filter(answer => answer !== null).length
     const unattemptedCount = questions.length - answeredQuestions
-    const confirmMessage = unattemptedCount > 0 
+    const confirmMessage = unattemptedCount > 0
       ? `Are you sure you want to submit the exam?\n\nYou have ${unattemptedCount} unattempted questions.`
       : 'Are you sure you want to submit the exam?'
-    
+
     if (!window.confirm(confirmMessage)) {
       return
     }
-    
+
     setSubmitting(true)
     console.log(Object.entries(answers).map(([questionId, selectedOption]) => ({
       question_id: questionId,
       selected_option: selectedOption
     })));
-    
+
     try {
       const answersArray = questions.map(question => ({
         question_id: question.id,
@@ -220,7 +221,7 @@ const StudentExam = () => {
       }))
 
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (!session) {
         toast.error('Session expired. Please login again.')
         navigate('/auth')
@@ -282,70 +283,70 @@ const StudentExam = () => {
 
   const renderMathText = (text: string) => {
     if (!text) return text
-    
+
     // Debug log to see the actual text
     console.log('Rendering text:', text)
-    
+
     try {
       // Handle both $$....$$ and $....$ patterns
       const parts = []
       let currentIndex = 0
-      
+
       // First handle block math ($$...$$)
       const blockMathRegex = /\$\$([^$]+?)\$\$/g
       let match
-      
+
       while ((match = blockMathRegex.exec(text)) !== null) {
         // Add text before the math
         if (match.index > currentIndex) {
           const beforeText = text.slice(currentIndex, match.index)
           parts.push(...renderInlineMath(beforeText))
         }
-        
+
         // Add block math
         parts.push(<BlockMath key={`block-${match.index}`} math={match[1]} />)
         currentIndex = match.index + match[0].length
       }
-      
+
       // Add remaining text
       if (currentIndex < text.length) {
         const remainingText = text.slice(currentIndex)
         parts.push(...renderInlineMath(remainingText))
       }
-      
+
       return parts.length > 0 ? parts : text
     } catch (error) {
       console.error('Math rendering error:', error)
       return text
     }
   }
-  
+
   const renderInlineMath = (text: string) => {
     if (!text) return []
-    
+
     const parts = []
     let currentIndex = 0
-    
+
     // Handle inline math ($...$)
     const inlineMathRegex = /\$([^$]+?)\$/g
     let match
-    
+
     while ((match = inlineMathRegex.exec(text)) !== null) {
       // Add text before the math
       if (match.index > currentIndex) {
         parts.push(text.slice(currentIndex, match.index))
       }
-      
+
       // Add inline math
       parts.push(<InlineMath key={`inline-${match.index}`} math={match[1]} />)
       currentIndex = match.index + match[0].length
     }
-    
+
     // Add remaining text
     if (currentIndex < text.length) {
       parts.push(text.slice(currentIndex))
     }
-    
+
     return parts.length > 0 ? parts : [text]
   }
 
@@ -363,7 +364,7 @@ const StudentExam = () => {
       </div>
     )
   }
-console.log(examData);
+  console.log(examData);
 
   const questions = examData.questions
   const question = questions[currentQuestion]
@@ -385,11 +386,11 @@ console.log(examData);
   }, {} as Record<string, { name: string; subject: string; questions: (Question & { globalIndex: number })[]; startIndex: number }>)
 
   const sectionArray = Object.values(sections)
-console.log(question);
+  console.log(question);
 
   return (
-    <div 
-      className="min-h-screen bg-background p-4" 
+    <div
+      className="min-h-screen bg-background p-4"
       style={{
         userSelect: 'none',
         WebkitUserSelect: 'none',
@@ -406,7 +407,7 @@ console.log(question);
               <div>
                 <h1 className="text-2xl font-bold">Exam in Progress</h1>
                 <p className="text-muted-foreground">
-                  Question {currentQuestion + 1} of {questions.length} • 
+                  Question {currentQuestion + 1} of {questions.length} •
                   Answered: {answeredCount}/{questions.length}
                   {tabSwitchCount > 0 && (
                     <span className="text-red-600 ml-2">• Tab switches: {tabSwitchCount}</span>
@@ -439,7 +440,9 @@ console.log(question);
               </span>
             </CardTitle>
           </CardHeader>
+
           <CardContent>
+            {/* Question Image - only shown if available */}
             {question.image_url && (
               <div className="mb-6">
                 <img
@@ -451,23 +454,61 @@ console.log(question);
                 />
               </div>
             )}
-            <div className="text-lg mb-6">{renderMathText(question.question_text)}</div>
-            
+
+            {/* Question Text */}
+            <div className="text-lg mb-6">
+              {renderMathText(question.question_text)}
+            </div>
+
+            {/* Options */}
             <RadioGroup
               value={answers[question.id] || ''}
               onValueChange={(value) => handleAnswerChange(question.id, value)}
             >
               {question.options.map((option) => (
-                <div key={option.key} className="flex items-center space-x-2 p-3 rounded-lg border hover:bg-muted/50">
-                  <RadioGroupItem value={option.key} id={`${question.id}_${option.key}`} />
-                  <Label htmlFor={`${question.id}_${option.key}`} className="flex-1 cursor-pointer">
-                    <span className="font-medium mr-2">{option.key}.</span>
-                    <span>{renderMathText(option.text)}</span>
+                <div
+                  key={option.key}
+                  className="flex items-start space-x-2 p-3 rounded-lg border hover:bg-muted/50"
+                >
+                  <RadioGroupItem
+                    value={option.key}
+                    id={`${question.id}_${option.key}`}
+                    className="mt-1"
+                  />
+
+                  <Label
+                    htmlFor={`${question.id}_${option.key}`}
+                    className="flex-1 cursor-pointer"
+                  >
+                    <div className="flex gap-2">
+                      <span className="font-medium">
+                        {option.key}.
+                      </span>
+
+                      <div className="flex-1">
+                        {/* Option Text */}
+                        {option.text && (
+                          <span>{renderMathText(option.text)}</span>
+                        )}
+
+                        {/* Option Image - only shown if available */}
+                        {option.image_url && (
+                          <div className={option.text ? 'mt-3' : ''}>
+                            <img
+                              src={option.image_url}
+                              alt={`Option ${option.key}`}
+                              loading="lazy"
+                              className="max-w-full h-auto max-h-64 object-contain rounded-lg border"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </Label>
                 </div>
               ))}
             </RadioGroup>
-            
+
             {/* Clear Response Button */}
             <div className="mt-4 flex justify-end">
               <Button
@@ -534,7 +575,7 @@ console.log(question);
                   )
                 })}
               </div>
-              
+
               <p className="text-sm font-medium mb-3">Question Navigator:</p>
               <div className="grid grid-cols-10 gap-2">
                 {questions.map((_, index) => (
@@ -542,11 +583,10 @@ console.log(question);
                     key={index}
                     variant={currentQuestion === index ? 'default' : 'outline'}
                     size="sm"
-                    className={`w-10 h-10 p-0 ${
-                      answers[questions[index].id] && answers[questions[index].id] !== null
-                        ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200' 
-                        : ''
-                    }`}
+                    className={`w-10 h-10 p-0 ${answers[questions[index].id] && answers[questions[index].id] !== null
+                      ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200'
+                      : ''
+                      }`}
                     onClick={() => setCurrentQuestion(index)}
                   >
                     {index + 1}

@@ -15,7 +15,7 @@ const JoinExam = () => {
 
   const handleJoinExam = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!examCode.trim()) {
       toast.error('Please enter an exam code')
       return
@@ -24,7 +24,7 @@ const JoinExam = () => {
     setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (!session) {
         toast.error('Please login to join the exam')
         navigate('/auth')
@@ -55,11 +55,11 @@ const JoinExam = () => {
       }
 
       const data = await response.json()
-      
+
       // Success - redirect to exam page with data
       toast.success('Exam started successfully!')
-      navigate('/student/exam', { 
-        state: { 
+      navigate('/student/exam', {
+        state: {
           examData: data,
           examCode: examCode.trim()
         }
@@ -96,10 +96,10 @@ const JoinExam = () => {
                   disabled={loading}
                 />
               </div>
-              
-              <Button 
-                type="submit" 
-                className="w-full" 
+
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={loading || !examCode.trim()}
               >
                 {loading ? (

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Plus, Loader2, ArrowLeft, X, Image, Eye, Edit, Filter, Search } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, Image, Eye, Edit, Filter, Search, ImagePlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { API_BASE_URL } from '@/lib/envs'
 import 'katex/dist/katex.min.css'
@@ -57,9 +57,16 @@ interface Question {
   question_text: string
   image_url?: string
   option_a: string
+  option_a_image_url?: string
+
   option_b: string
+  option_b_image_url?: string
+
   option_c: string
+  option_c_image_url?: string
+
   option_d: string
+  option_d_image_url?: string
   correct_option: string
   marks: number
   negative_marks: number
@@ -130,7 +137,12 @@ const ManageQuestions = () => {
     difficulty: 'easy',
     explanation: '',
     image_url: '',
-    explanation_image_url: ''
+    explanation_image_url: '',
+
+    option_a_image_url: '',
+    option_b_image_url: '',
+    option_c_image_url: '',
+    option_d_image_url: '',
   })
 
   useEffect(() => {
@@ -294,6 +306,82 @@ const ManageQuestions = () => {
     }
   }
 
+  const handleOptionImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    option: 'option_a' | 'option_b' | 'option_c' | 'option_d'
+  ) => {
+    const file = e.target.files?.[0]
+
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB')
+      return
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session) {
+        toast.error('Session expired. Please login again.')
+        return
+      }
+
+      const formDataUpload = new FormData()
+
+      formDataUpload.append('image', file)
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/admin/upload-question-options-image`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: formDataUpload
+        }
+      )
+
+      const data = await response.json()
+
+      const imageField = `${option}_image_url`
+
+      setFormData(prev => {
+        const updatedData = {
+          ...prev,
+          [imageField]: data.imageUrl
+        }
+
+        return updatedData
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+
+        throw new Error(
+          error.error || 'Failed to upload option image'
+        )
+      }
+
+      toast.success(
+        `Option ${option.replace('option_', '').toUpperCase()} image uploaded successfully`
+      )
+
+    } catch (error: any) {
+      toast.error(
+        'Failed to upload option image: ' + error.message
+      )
+    } finally {
+      // Allow selecting the same file again
+      e.target.value = ''
+    }
+  }
+
   const removeImage = (type: 'question' | 'explanation' = 'question') => {
     if (type === 'question') {
       setFormData(prev => ({ ...prev, image_url: '' }))
@@ -414,9 +502,13 @@ const ManageQuestions = () => {
         question_text,
         image_url,
         option_a,
+        option_a_image_url,
         option_b,
+        option_b_image_url,
         option_c,
+        option_c_image_url,
         option_d,
+        option_d_image_url,
         correct_option,
         marks,
         negative_marks,
@@ -525,17 +617,30 @@ const ManageQuestions = () => {
         },
         body: JSON.stringify({
           topic_id: selectedTopic,
+
           question_text: formData.question_text.trim(),
+
           option_a: formData.option_a.trim(),
+          option_a_image_url: formData.option_a_image_url || null,
+
           option_b: formData.option_b.trim(),
+          option_b_image_url: formData.option_b_image_url || null,
+
           option_c: formData.option_c.trim(),
+          option_c_image_url: formData.option_c_image_url || null,
+
           option_d: formData.option_d.trim(),
+          option_d_image_url: formData.option_d_image_url || null,
+
           correct_option: formData.correct_option,
+
           marks: formData.marks,
           negative_marks: formData.negative_marks,
           difficulty: formData.difficulty,
+
           explanation: formData.explanation.trim(),
-          image_url: formData.image_url || null
+
+          image_url: formData.image_url || null,
         })
       })
 
@@ -549,9 +654,13 @@ const ManageQuestions = () => {
       setFormData({
         question_text: '',
         option_a: '',
+        option_a_image_url: '',
         option_b: '',
+        option_b_image_url: '',
         option_c: '',
+        option_c_image_url: '',
         option_d: '',
+        option_d_image_url: '',
         correct_option: '',
         marks: 4,
         negative_marks: 1,
@@ -562,7 +671,7 @@ const ManageQuestions = () => {
       })
       setImagePreview(null)
       setExplanationImagePreview(null)
-      fetchData()
+      // fetchData()
     } catch (error) {
       toast.error('Failed to add question: ' + error.message)
     } finally {
@@ -574,19 +683,35 @@ const ManageQuestions = () => {
     setEditingQuestion(question)
     setFormData({
       question_text: question.question_text,
+
       option_a: question.option_a,
+      option_a_image_url: question.option_a_image_url || '',
+
       option_b: question.option_b,
+      option_b_image_url: question.option_b_image_url || '',
+
       option_c: question.option_c,
+      option_c_image_url: question.option_c_image_url || '',
+
       option_d: question.option_d,
+      option_d_image_url: question.option_d_image_url || '',
+
       correct_option: question.correct_option,
+
       marks: question.marks,
       negative_marks: question.negative_marks,
       difficulty: question.difficulty,
+
       explanation: question.explanation || '',
-      image_url: question.image_url || '',
-      explanation_image_url: ''
+      explanation_image_url: question.explanation_image_url || '',
+
+      image_url: question.image_url || ''
     })
     setImagePreview(question.image_url || null)
+    setExplanationImagePreview(
+      question.explanation_image_url || null
+    )
+
     setEditModalOpen(true)
   }
 
@@ -616,16 +741,34 @@ const ManageQuestions = () => {
         },
         body: JSON.stringify({
           question_text: formData.question_text.trim(),
+          image_url: formData.image_url || null,
+
           option_a: formData.option_a.trim(),
+          option_a_image_url:
+            formData.option_a_image_url || null,
+
           option_b: formData.option_b.trim(),
+          option_b_image_url:
+            formData.option_b_image_url || null,
+
           option_c: formData.option_c.trim(),
+          option_c_image_url:
+            formData.option_c_image_url || null,
+
           option_d: formData.option_d.trim(),
+          option_d_image_url:
+            formData.option_d_image_url || null,
+
           correct_option: formData.correct_option,
+
           marks: formData.marks,
           negative_marks: formData.negative_marks,
           difficulty: formData.difficulty,
+
           explanation: formData.explanation.trim(),
-          image_url: formData.image_url || null
+
+          explanation_image_url:
+            formData.explanation_image_url || null
         })
       })
 
@@ -637,7 +780,7 @@ const ManageQuestions = () => {
       toast.success('Question updated successfully')
       setEditModalOpen(false)
       setEditingQuestion(null)
-      fetchData()
+      // fetchData()
     } catch (error) {
       toast.error('Failed to update question: ' + error.message)
     } finally {
@@ -657,7 +800,7 @@ const ManageQuestions = () => {
       if (error) throw error
 
       toast.success('Question deleted successfully')
-      fetchData()
+      // fetchData()
     } catch (error) {
       toast.error('Failed to delete question: ' + error.message)
     }
@@ -902,22 +1045,101 @@ const ManageQuestions = () => {
 
                 {/* Options */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Options (supports LaTeX)</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {['option_a', 'option_b', 'option_c', 'option_d'].map((option, index) => (
-                      <div key={option} className="space-y-1">
-                        <Input
-                          placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                          value={formData[option as keyof typeof formData] as string}
-                          onChange={(e) => setFormData({ ...formData, [option]: e.target.value })}
-                        />
-                        {showPreview && formData[option as keyof typeof formData] && (
-                          <div className="text-xs p-2 border rounded bg-gray-50">
-                            {renderMath(formData[option as keyof typeof formData] as string)}
+                  <label className="text-sm font-medium">
+                    Options (supports LaTeX)
+                  </label>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {['option_a', 'option_b', 'option_c', 'option_d'].map(
+                      (option, index) => {
+                        const imageField = `${option}_image_url` as keyof typeof formData
+
+                        return (
+                          <div key={option} className="space-y-1">
+
+                            <div className="relative">
+                              <Input
+                                placeholder={`Option ${String.fromCharCode(65 + index)}`}
+                                value={
+                                  formData[
+                                  option as keyof typeof formData
+                                  ] as string
+                                }
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    [option]: e.target.value,
+                                  })
+                                }
+                                className="pr-12"
+                              />
+
+                              {/* Image upload button */}
+                              <label
+                                className="absolute right-3 top-1/2 flex -translate-y-1/2 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-primary"
+                                title={`Add image to Option ${String.fromCharCode(65 + index)}`}
+                              >
+                                <ImagePlus size={18} />
+
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) =>
+                                    handleOptionImageUpload(
+                                      e,
+                                      option as
+                                      | 'option_a'
+                                      | 'option_b'
+                                      | 'option_c'
+                                      | 'option_d'
+                                    )
+                                  }
+                                />
+                              </label>
+                            </div>
+
+                            {/* Image preview */}
+                            {formData[imageField] && (
+                              <div className="relative mt-2 w-fit">
+                                <img
+                                  src={formData[imageField] as string}
+                                  alt={`Option ${String.fromCharCode(65 + index)}`}
+                                  className="max-h-32 rounded-md border object-contain"
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      [imageField]: '',
+                                    }))
+                                  }
+                                  className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            )}
+
+                            {/* LaTeX Preview */}
+                            {showPreview &&
+                              formData[
+                              option as keyof typeof formData
+                              ] && (
+                                <div className="rounded border bg-gray-50 p-2 text-xs">
+                                  {renderMath(
+                                    formData[
+                                    option as keyof typeof formData
+                                    ] as string
+                                  )}
+                                </div>
+                              )}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        )
+                      }
+                    )}
                   </div>
                 </div>
 
@@ -1374,21 +1596,105 @@ const ManageQuestions = () => {
               {/* Options */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Options</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {['option_a', 'option_b', 'option_c', 'option_d'].map((option, index) => (
-                    <div key={option} className="space-y-1">
-                      <Input
-                        placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                        value={formData[option as keyof typeof formData] as string}
-                        onChange={(e) => setFormData({ ...formData, [option]: e.target.value })}
-                      />
-                      {showPreview && formData[option as keyof typeof formData] && (
-                        <div className="text-xs p-2 border rounded bg-gray-50">
-                          {renderMath(formData[option as keyof typeof formData] as string)}
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {["option_a", "option_b", "option_c", "option_d"].map(
+                    (option, index) => {
+                      const imageField =
+                        `${option}_image_url` as keyof typeof formData
+
+                      return (
+                        <div key={option} className="space-y-2">
+                          {/* Option Input */}
+                          <div className="relative">
+                            <Input
+                              placeholder={`Option ${String.fromCharCode(
+                                65 + index
+                              )}`}
+                              value={
+                                formData[
+                                option as keyof typeof formData
+                                ] as string
+                              }
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  [option]: e.target.value,
+                                })
+                              }
+                              className="pr-11"
+                            />
+
+                            {/* Add Image Button */}
+                            <label
+                              className="absolute right-3 top-1/2 flex -translate-y-1/2 cursor-pointer text-muted-foreground transition-colors hover:text-primary"
+                              title={`Add image to Option ${String.fromCharCode(
+                                65 + index
+                              )}`}
+                            >
+                              <ImagePlus size={18} />
+
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) =>
+                                  handleOptionImageUpload(
+                                    e,
+                                    option as
+                                    | "option_a"
+                                    | "option_b"
+                                    | "option_c"
+                                    | "option_d"
+                                  )
+                                }
+                              />
+                            </label>
+                          </div>
+
+                          {/* Image Preview - Only shown if image exists */}
+                          {formData[imageField] && (
+                            <div className="relative overflow-hidden rounded-md border bg-gray-50">
+                              <img
+                                src={formData[imageField] as string}
+                                alt={`Option ${String.fromCharCode(65 + index)}`}
+                                className="max-h-48 w-full object-contain p-2"
+                              />
+
+                              {/* Remove Image */}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    [imageField]: "",
+                                  }))
+                                }
+                                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow hover:bg-gray-100"
+                                title="Remove image"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* LaTeX Preview */}
+                          {showPreview &&
+                            formData[
+                            option as keyof typeof formData
+                            ] && (
+                              <div className="rounded border bg-gray-50 p-2 text-xs">
+                                {renderMath(
+                                  formData[
+                                  option as keyof typeof formData
+                                  ] as string
+                                )}
+                              </div>
+                            )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                      )
+                    }
+                  )}
                 </div>
               </div>
 
