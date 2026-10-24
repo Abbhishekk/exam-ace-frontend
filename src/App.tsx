@@ -13,6 +13,7 @@ import ManageChapters from "./pages/admin/ManageChapters";
 import ManageTopics from "./pages/admin/ManageTopics";
 import QuestionBank from "./pages/admin/QuestionBank";
 import ManageQuestions from "./pages/admin/ManageQuestions";
+import BulkQuestionImport from "./pages/admin/BulkQuestionImport";
 import ManageExams from "./pages/admin/ManageExams";
 import AdminLeaderboard from "./pages/admin/AdminLeaderboard";
 import AdminExamSubmissions from "./pages/admin/AdminExamSubmissions";
@@ -48,10 +49,12 @@ const App = () => (
             <Route path="/admin/chapters" element={<AdminProtectedRoute><ManageChapters /></AdminProtectedRoute>} />
             <Route path="/admin/topics" element={<AdminProtectedRoute><ManageTopics /></AdminProtectedRoute>} />
             <Route path="/admin/questions" element={<AdminProtectedRoute><ManageQuestions /></AdminProtectedRoute>} />
+            <Route path="/admin/questions/import" element={<AdminProtectedRoute><BulkQuestionImport /></AdminProtectedRoute>} />
             <Route path="/admin/exams" element={<AdminProtectedRoute><ManageExams /></AdminProtectedRoute>} />
             <Route path="/admin/exams/create" element={<AdminProtectedRoute><CreateExam /></AdminProtectedRoute>} />
             <Route path="/admin/exams/rule-based" element={<AdminProtectedRoute><CreateExamRuleBased /></AdminProtectedRoute>} />
             <Route path="/admin/exams/:examId/submissions" element={<AdminProtectedRoute><AdminExamSubmissions /></AdminProtectedRoute>} />
+            <Route path="/admin/submissions" element={<AdminProtectedRoute><AdminExamSubmissions /></AdminProtectedRoute>} />
             <Route path="/admin/exams/:examId/analytics" element={<AdminProtectedRoute><ExamAnalytics /></AdminProtectedRoute>} />
             <Route path="/admin/exams/questions-enhanced" element={<AdminProtectedRoute><CreateExamRuleBasedEnhanced /></AdminProtectedRoute>} />
             <Route path="/admin/exams/multi-subject" element={<AdminProtectedRoute><CreateMultiSubjectExam /></AdminProtectedRoute>} />

@@ -11,7 +11,8 @@ import {
   Trophy,
   LogOut,
   LayoutDashboard,
-  Settings
+  Settings,
+  Upload
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, href: "/admin" },
   { title: "Classes & Subjects", icon: GraduationCap, href: "/admin/classes" },
   { title: "Question Bank", icon: FileQuestion, href: "/admin/questions" },
+  { title: "Bulk Import", icon: Upload, href: "/admin/questions/import" },
   { title: "Exams", icon: ClipboardList, href: "/admin/exams" },
   { title: "Submissions", icon: Users, href: "/admin/submissions" },
   { title: "Leaderboard", icon: Trophy, href: "/admin/leaderboard" },
@@ -83,70 +85,110 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50/50 flex">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border p-6 hidden lg:block z-50">
-        <Link to="/admin" className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 gradient-primary rounded-lg flex items-center justify-center">
-            <img 
-              src="/exam-ace-logo.jpeg" 
-              alt="Exam Ace Logo" 
-              className=" rounded-lg" 
-            />
-          </div>
-          <div>
-            <h1 className="font-display font-bold text-sidebar-foreground">Exam Ace</h1>
-            <p className="text-xs text-sidebar-foreground/60">Admin Panel</p>
-          </div>
-        </Link>
+      <aside className="fixed left-0 top-0 h-full w-64 bg-white border-r border-slate-200/80 p-5 hidden lg:flex lg:flex-col justify-between z-40 shadow-[1px_0_4px_rgba(0,0,0,0.02)]">
+        <div>
+          <Link to="/admin" className="flex items-center gap-3 px-2 mb-8">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md shadow-blue-500/20 text-white font-bold overflow-hidden">
+              <img 
+                src="/exam-ace-logo.jpeg" 
+                alt="Exam Ace Logo" 
+                className="w-full h-full object-cover" 
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h1 className="font-display font-bold text-slate-900 text-base tracking-tight">Exam Ace</h1>
+                <span className="text-[10px] font-semibold uppercase tracking-wider bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200/60">SaaS</span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium">Institute Portal</p>
+            </div>
+          </Link>
 
-        <nav className="space-y-1">
-          {menuItems.map((item, index) => (
-            <Link
-              key={index}
-              to={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
-                isActive(item.href)
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              )}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="text-sm font-medium">{item.title}</span>
-            </Link>
-          ))}
-        </nav>
+          <div className="px-2 mb-2">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Navigation</p>
+          </div>
 
-        <div className="absolute bottom-6 left-6 right-6">
+          <nav className="space-y-1">
+            {menuItems.map((item, index) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={index}
+                  to={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                    active
+                      ? "bg-blue-50 text-blue-600 shadow-sm font-semibold border border-blue-100"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                  )}
+                >
+                  <item.icon className={cn("w-4.5 h-4.5 transition-colors", active ? "text-blue-600" : "text-slate-400")} />
+                  <span>{item.title}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Bottom User Area */}
+        <div className="pt-4 border-t border-slate-100 space-y-3">
+          <div className="flex items-center gap-3 px-2 py-1.5 rounded-lg bg-slate-50 border border-slate-200/60">
+            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold flex items-center justify-center text-xs">
+              {user?.email?.charAt(0).toUpperCase() || "A"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-slate-900 truncate">
+                {user?.email || "Admin"}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="text-[11px] text-slate-500 font-medium">Active Admin</span>
+              </div>
+            </div>
+          </div>
+
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            size="sm"
+            className="w-full justify-start text-slate-600 hover:text-rose-600 hover:bg-rose-50"
             onClick={handleLogout}
           >
-            <LogOut className="w-5 h-5 mr-3" />
-            Logout
+            <LogOut className="w-4 h-4 mr-2.5" />
+            Sign Out
           </Button>
         </div>
       </aside>
 
       {/* Mobile Header */}
-      <header className="lg:hidden sticky top-0 z-50 bg-card border-b border-border p-4">
-        <div className="flex items-center justify-between">
-          <Link to="/admin" className="flex items-center gap-2">
-            <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-display font-bold">ExamPro</span>
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 flex items-center justify-between shadow-sm">
+        <Link to="/admin" className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
+            EA
+          </div>
+          <div>
+            <span className="font-display font-bold text-slate-900 text-sm">Exam Ace</span>
+            <span className="text-[10px] text-slate-500 block">Admin Portal</span>
+          </div>
+        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/admin/questions/import">
+            <Button size="sm" variant="outline" className="text-xs h-8">
+              <Upload className="w-3.5 h-3.5 mr-1" /> Import
+            </Button>
           </Link>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
-            <LogOut className="w-5 h-5" />
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-rose-600" onClick={handleLogout}>
+            <LogOut className="w-4 h-4" />
           </Button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="lg:ml-64 p-6 lg:p-8">
+      {/* Main Content Area */}
+      <main className="flex-1 lg:ml-64 min-h-screen pt-16 lg:pt-0 p-4 sm:p-6 lg:p-8 max-w-7xl">
         {children}
       </main>
     </div>

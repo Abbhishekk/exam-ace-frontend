@@ -8,11 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Plus, Loader2, ArrowLeft, X, Image, Eye, Edit, Filter, Search, ImagePlus } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, Image, Eye, Edit, Filter, Search, ImagePlus, Upload, ChevronDown, ChevronUp, Sparkles, BookOpen } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { API_BASE_URL } from '@/lib/envs'
 import 'katex/dist/katex.min.css'
 import { InlineMath, BlockMath } from 'react-katex'
+import { AdminLayout } from '@/components/admin/AdminLayout'
+import { PageHeader } from '@/components/common/PageHeader'
+import { StatusBadge } from '@/components/common/StatusBadge'
+import { EmptyState } from '@/components/common/EmptyState'
 
 interface Class {
   id: string
@@ -104,6 +108,8 @@ const ManageQuestions = () => {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
 
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [showLatexHelp, setShowLatexHelp] = useState(false)
   const PAGE_SIZE = 10;
   const [QuestionCount, setQuestionCount] = useState();
   const [page, setPage] = useState(0);
@@ -818,26 +824,105 @@ const ManageQuestions = () => {
   }, [classes, subjects, chapters, topics, filters]);
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
+    <AdminLayout>
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Link to="/admin">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60">
+                Curriculum Repository
+              </span>
+              <span className="text-xs text-slate-400">•</span>
+              <span className="text-xs text-slate-500 font-medium">
+                {QuestionCount ? `${QuestionCount.toLocaleString()} Total Questions` : "Loading..."}
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-slate-900 tracking-tight">
+              Question Bank
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Filter, search, edit and create JEE & NEET questions with LaTeX formulas and diagrams.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowLatexHelp(!showLatexHelp)}
+              className="text-xs text-slate-700"
+            >
+              <Sparkles className="w-3.5 h-3.5 mr-1.5 text-amber-500" />
+              {showLatexHelp ? "Hide LaTeX Tips" : "LaTeX Guide"}
             </Button>
-          </Link>
-          <h1 className="text-3xl font-bold">Question Bank</h1>
+            <Link to="/admin/questions/import">
+              <Button variant="outline" size="sm" className="text-xs">
+                <Upload className="w-3.5 h-3.5 mr-1.5 text-blue-600" />
+                Bulk Import
+              </Button>
+            </Link>
+            <Button
+              onClick={() => setShowAddForm(!showAddForm)}
+              size="sm"
+              className="text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+            >
+              {showAddForm ? (
+                <>
+                  <ChevronUp className="w-4 h-4 mr-1.5" />
+                  Close Form
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Add Question
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
-        {/* Add Question Form */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5" />
-              Add New Question
-            </CardTitle>
+        {/* LaTeX Tips Card */}
+        {showLatexHelp && (
+          <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200/80 text-xs text-slate-700 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-blue-900 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-blue-600" /> LaTeX Math Formatting Cheatsheet
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => setShowLatexHelp(false)} className="h-6 px-2 text-xs">
+                Dismiss
+              </Button>
+            </div>
+            <p className="text-slate-600">
+              Wrap inline formulas in single dollar signs: <code className="bg-white px-1.5 py-0.5 rounded border border-blue-200 font-mono text-blue-700">$E = mc^2$</code>. Wrap block equations in double dollar signs: <code className="bg-white px-1.5 py-0.5 rounded border border-blue-200 font-mono text-blue-700">$$\int_0^\infty e^{-x} dx$$</code>.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-[11px]">
+              <span className="bg-white/80 p-1.5 rounded border border-blue-100">$x^2 + y^2 = r^2$</span>
+              <span className="bg-white/80 p-1.5 rounded border border-blue-100">\frac{"{a}"}{"{b}"}</span>
+              <span className="bg-white/80 p-1.5 rounded border border-blue-100">\sqrt{"{x}"}</span>
+              <span className="bg-white/80 p-1.5 rounded border border-blue-100">\theta, \lambda, \Delta</span>
+            </div>
+          </div>
+        )}
+
+        {/* Add Question Form (Collapsible) */}
+        {showAddForm && (
+        <Card className="border-blue-200 shadow-sm bg-white">
+          <CardHeader className="pb-4 border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-semibold text-slate-900 flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-blue-600" />
+                  Add New Single Question
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-500">
+                  Select hierarchy topic, specify marking rules, and enter options.
+                </CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowAddForm(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -1226,222 +1311,327 @@ const ManageQuestions = () => {
                   )}
                 </div>
 
-                <Button type="submit" disabled={submitting || !selectedTopic} className="w-full">
-                  {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Add Question
+                <Button type="submit" disabled={submitting || !selectedTopic} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium">
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                  Save Question to Repository
                 </Button>
               </div>
             </form>
           </CardContent>
         </Card>
+        )}
 
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="w-5 h-5" />
-              Filter Questions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <Select
-                value={filters.classId || 'all'}
-                onValueChange={(value) => handleFilterChange('classId', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All Classes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Classes</SelectItem>
-                  {classes.map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id}>
-                      {cls.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {/* Filters Card */}
+        <Card className="border-slate-200/80 shadow-xs bg-white">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Filter className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Filter Repository</h3>
+                  <p className="text-xs text-slate-500">Narrow down questions by syllabus taxonomy</p>
+                </div>
+              </div>
 
-              <Select
-                value={filters.subjectId || 'all'}
-                onValueChange={(value) => handleFilterChange('subjectId', value)}
-                disabled={!filters.classId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All Subjects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Subjects</SelectItem>
-                  {filteredSubjects.map((subject) => (
-                    <SelectItem key={subject.id} value={subject.id}>
-                      {subject.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {(filters.classId || filters.subjectId || filters.chapterId || filters.topicId || filters.searchText) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    handleFilterChange('classId', 'all');
+                    handleFilterChange('subjectId', 'all');
+                    handleFilterChange('chapterId', 'all');
+                    handleFilterChange('topicId', 'all');
+                    handleFilterChange('searchText', '');
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-800 h-7 px-2"
+                >
+                  <X className="w-3.5 h-3.5 mr-1" /> Reset Filters
+                </Button>
+              )}
+            </div>
 
-              <Select
-                value={filters.chapterId || 'all'}
-                onValueChange={(value) => handleFilterChange('chapterId', value)}
-                disabled={!filters.subjectId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All Chapters" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Chapters</SelectItem>
-                  {filteredChapters.map((chapter) => (
-                    <SelectItem key={chapter.id} value={chapter.id}>
-                      {chapter.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Class</label>
+                <Select
+                  value={filters.classId || 'all'}
+                  onValueChange={(value) => handleFilterChange('classId', value)}
+                >
+                  <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                    <SelectValue placeholder="All Classes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Classes</SelectItem>
+                    {classes.map((cls) => (
+                      <SelectItem key={cls.id} value={cls.id} className="text-xs">
+                        {cls.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select
-                value={filters.topicId || 'all'}
-                onValueChange={(value) => handleFilterChange('topicId', value)}
-                disabled={!filters.chapterId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All Topics" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Topics</SelectItem>
-                  {filteredTopics.map((topic) => (
-                    <SelectItem key={topic.id} value={topic.id}>
-                      {topic.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Subject</label>
+                <Select
+                  value={filters.subjectId || 'all'}
+                  onValueChange={(value) => handleFilterChange('subjectId', value)}
+                  disabled={!filters.classId || filters.classId === 'all'}
+                >
+                  <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                    <SelectValue placeholder="All Subjects" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Subjects</SelectItem>
+                    {filteredSubjects.map((subject) => (
+                      <SelectItem key={subject.id} value={subject.id} className="text-xs">
+                        {subject.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  placeholder="Search questions..."
-                  value={filters.searchText}
-                  onChange={(e) => handleFilterChange('searchText', e.target.value)}
-                  className="pl-10"
-                />
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Chapter</label>
+                <Select
+                  value={filters.chapterId || 'all'}
+                  onValueChange={(value) => handleFilterChange('chapterId', value)}
+                  disabled={!filters.subjectId || filters.subjectId === 'all'}
+                >
+                  <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                    <SelectValue placeholder="All Chapters" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Chapters</SelectItem>
+                    {filteredChapters.map((chapter) => (
+                      <SelectItem key={chapter.id} value={chapter.id} className="text-xs">
+                        {chapter.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Topic</label>
+                <Select
+                  value={filters.topicId || 'all'}
+                  onValueChange={(value) => handleFilterChange('topicId', value)}
+                  disabled={!filters.chapterId || filters.chapterId === 'all'}
+                >
+                  <SelectTrigger className="h-9 text-xs bg-slate-50/50 border-slate-200">
+                    <SelectValue placeholder="All Topics" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Topics</SelectItem>
+                    {filteredTopics.map((topic) => (
+                      <SelectItem key={topic.id} value={topic.id} className="text-xs">
+                        {topic.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Instant Search</label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+                  <Input
+                    placeholder="Search keywords, LaTeX..."
+                    value={filters.searchText}
+                    onChange={(e) => handleFilterChange('searchText', e.target.value)}
+                    className="pl-8 h-9 text-xs bg-slate-50/50 border-slate-200"
+                  />
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Questions Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Questions ({QuestionCount})</CardTitle>
+        {/* Questions Table Card */}
+        <Card className="border-slate-200/80 shadow-xs bg-white overflow-hidden">
+          <CardHeader className="py-4 px-5 border-b border-slate-100 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CardTitle className="text-base font-semibold text-slate-900">
+                Question Records
+              </CardTitle>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+                {QuestionCount ? `${QuestionCount.toLocaleString()} total` : `${questions.length} loaded`}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Easy
+              </span>
+              <span className="inline-flex items-center gap-1.5 ml-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span> Medium
+              </span>
+              <span className="inline-flex items-center gap-1.5 ml-2">
+                <span className="w-2 h-2 rounded-full bg-rose-500"></span> Hard
+              </span>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {loading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
+              <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+                <Loader2 className="w-7 h-7 animate-spin text-blue-600 mb-2" />
+                <p className="text-xs font-medium">Fetching question repository...</p>
               </div>
             ) : questions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {questions.length === 0 ? 'No questions found. Add your first question above.' : 'No questions match the current filters.'}
+              <div className="py-12">
+                <EmptyState
+                  icon={BookOpen}
+                  title="No questions match the current filters"
+                  description="Try broadening your taxonomy selection or search keywords to view questions."
+                  actionLabel="Add Single Question"
+                  onAction={() => setShowAddForm(true)}
+                />
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Topic</TableHead>
-                      <TableHead>Question</TableHead>
-                      <TableHead>Image</TableHead>
-                      <TableHead>Options</TableHead>
-                      <TableHead>Correct</TableHead>
-                      <TableHead>Marks</TableHead>
-                      <TableHead>Difficulty</TableHead>
-                      <TableHead>Actions</TableHead>
+                    <TableRow className="bg-slate-50/70 hover:bg-slate-50/70 border-b border-slate-200/80">
+                      <TableHead className="w-[180px] text-xs font-semibold uppercase text-slate-500 tracking-wider">Taxonomy</TableHead>
+                      <TableHead className="text-xs font-semibold uppercase text-slate-500 tracking-wider">Question Formula / Text</TableHead>
+                      <TableHead className="w-[80px] text-xs font-semibold uppercase text-slate-500 tracking-wider">Diagram</TableHead>
+                      <TableHead className="w-[260px] text-xs font-semibold uppercase text-slate-500 tracking-wider">Options</TableHead>
+                      <TableHead className="w-[80px] text-xs font-semibold uppercase text-slate-500 tracking-wider text-center">Answer</TableHead>
+                      <TableHead className="w-[90px] text-xs font-semibold uppercase text-slate-500 tracking-wider text-center">Marks</TableHead>
+                      <TableHead className="w-[90px] text-xs font-semibold uppercase text-slate-500 tracking-wider">Difficulty</TableHead>
+                      <TableHead className="w-[100px] text-xs font-semibold uppercase text-slate-500 tracking-wider text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {questions.map((question) => (
-                      <TableRow key={question.id}>
-                        <TableCell className="text-sm">
-                          {question.topics.chapters.subjects.classes.name} - {question.topics.name}
+                      <TableRow key={question.id} className="hover:bg-slate-50/60 transition-colors border-b border-slate-100">
+                        <TableCell className="align-top py-3.5">
+                          <div className="space-y-1">
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                              {question.topics.chapters.subjects.classes.name}
+                            </span>
+                            <p className="text-xs font-semibold text-slate-800">
+                              {question.topics.chapters.subjects.name}
+                            </p>
+                            <p className="text-[11px] text-slate-500 leading-tight truncate max-w-[170px]" title={question.topics.name}>
+                              {question.topics.name}
+                            </p>
+                          </div>
                         </TableCell>
-                        <TableCell className="max-w-xs">
-                          <div className="truncate">{renderMath(question.question_text)}</div>
+                        <TableCell className="align-top py-3.5 max-w-sm">
+                          <div className="text-xs text-slate-800 leading-relaxed font-sans line-clamp-3">
+                            {renderMath(question.question_text)}
+                          </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="align-top py-3.5">
                           {question.image_url ? (
                             <img
                               src={question.image_url}
-                              alt="Question image"
-                              className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80"
+                              alt="Question"
+                              className="w-12 h-12 object-cover rounded-lg border border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all shadow-xs"
                               onClick={() => setModalImage(question.image_url)}
                             />
                           ) : (
-                            <span className="text-gray-400 text-sm">No image</span>
+                            <span className="text-[11px] text-slate-400 italic">None</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm">
-                          <div className="space-y-1">
-                            <div>A: {renderMath(question.option_a.substring(0, 20) + '...')}</div>
-                            <div>B: {renderMath(question.option_b.substring(0, 20) + '...')}</div>
-                            <div>C: {renderMath(question.option_c.substring(0, 20) + '...')}</div>
-                            <div>D: {renderMath(question.option_d.substring(0, 20) + '...')}</div>
+                        <TableCell className="align-top py-3.5">
+                          <div className="grid grid-cols-2 gap-1 text-[11px]">
+                            <div className={`p-1.5 rounded border ${question.correct_option === 'A' ? 'bg-emerald-50 border-emerald-300 font-semibold text-emerald-900' : 'bg-slate-50/60 border-slate-200/60 text-slate-700'}`}>
+                              <span className="font-bold mr-1">A:</span> {renderMath(question.option_a.substring(0, 18) + (question.option_a.length > 18 ? '…' : ''))}
+                            </div>
+                            <div className={`p-1.5 rounded border ${question.correct_option === 'B' ? 'bg-emerald-50 border-emerald-300 font-semibold text-emerald-900' : 'bg-slate-50/60 border-slate-200/60 text-slate-700'}`}>
+                              <span className="font-bold mr-1">B:</span> {renderMath(question.option_b.substring(0, 18) + (question.option_b.length > 18 ? '…' : ''))}
+                            </div>
+                            <div className={`p-1.5 rounded border ${question.correct_option === 'C' ? 'bg-emerald-50 border-emerald-300 font-semibold text-emerald-900' : 'bg-slate-50/60 border-slate-200/60 text-slate-700'}`}>
+                              <span className="font-bold mr-1">C:</span> {renderMath(question.option_c.substring(0, 18) + (question.option_c.length > 18 ? '…' : ''))}
+                            </div>
+                            <div className={`p-1.5 rounded border ${question.correct_option === 'D' ? 'bg-emerald-50 border-emerald-300 font-semibold text-emerald-900' : 'bg-slate-50/60 border-slate-200/60 text-slate-700'}`}>
+                              <span className="font-bold mr-1">D:</span> {renderMath(question.option_d.substring(0, 18) + (question.option_d.length > 18 ? '…' : ''))}
+                            </div>
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">{question.correct_option}</TableCell>
-                        <TableCell>{question.marks} / -{question.negative_marks}</TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-1 rounded text-xs ${question.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
-                            question.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
+                        <TableCell className="align-top py-3.5 text-center">
+                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-xs shadow-xs">
+                            {question.correct_option}
+                          </span>
+                        </TableCell>
+                        <TableCell className="align-top py-3.5 text-center text-xs font-semibold text-slate-700">
+                          <span className="text-emerald-600">+{question.marks}</span>
+                          <span className="text-slate-400"> / </span>
+                          <span className="text-rose-500">-{question.negative_marks}</span>
+                        </TableCell>
+                        <TableCell className="align-top py-3.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${
+                            question.difficulty === 'easy'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : question.difficulty === 'medium'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}>
                             {question.difficulty}
                           </span>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
+                        <TableCell className="align-top py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
                             <Button
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
+                              className="h-8 w-8 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
                               onClick={() => handleEdit(question)}
+                              title="Edit Question"
                             >
-                              <Edit className="w-4 h-4" />
+                              <Edit className="w-3.5 h-3.5" />
                             </Button>
                             <Button
-                              variant="destructive"
+                              variant="ghost"
                               size="sm"
+                              className="h-8 w-8 p-0 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
                               onClick={() => handleDelete(question.id)}
+                              title="Delete Question"
                             >
-                              Delete
+                              <X className="w-3.5 h-3.5" />
                             </Button>
                           </div>
                         </TableCell>
                       </TableRow>
-
                     ))}
                   </TableBody>
                 </Table>
               </div>
-
             )}
           </CardContent>
         </Card>
-        <div className="flex justify-center mt-6">
-          {hasMore && (
+
+        {/* Load More Pagination */}
+        {hasMore && (
+          <div className="flex flex-col items-center justify-center gap-2 py-4">
             <Button
               onClick={loadMoreQuestions}
               disabled={loadingMore}
+              variant="outline"
+              className="px-6 border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-medium shadow-xs"
             >
               {loadingMore ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading...
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-blue-600" />
+                  Loading Questions...
                 </>
               ) : (
-                "Load More"
+                `Load More Questions (${questions.length} loaded)`
               )}
             </Button>
-          )}
-        </div>
+            <p className="text-[11px] text-slate-400">
+              Showing {questions.length} questions of {QuestionCount || "repository"}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Image Modal */}
@@ -1744,7 +1934,7 @@ const ManageQuestions = () => {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminLayout>
   )
 }
 

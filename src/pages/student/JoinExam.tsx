@@ -10,7 +10,8 @@ import { API_BASE_URL } from '@/lib/envs'
 
 const JoinExam = () => {
   const navigate = useNavigate()
-  const [examCode, setExamCode] = useState('')
+  const savedCode = localStorage.getItem('active_exam_code') || ''
+  const [examCode, setExamCode] = useState(savedCode)
   const [loading, setLoading] = useState(false)
 
   const handleJoinExam = async (e: React.FormEvent) => {
@@ -48,6 +49,10 @@ const JoinExam = () => {
           toast.error('Exam has not started yet. Please wait for the scheduled time.')
         } else if (error.error?.includes('expired')) {
           toast.error('Exam time has expired.')
+          localStorage.removeItem('active_exam_code')
+        } else if (error.error?.includes('submitted')) {
+          toast.error('You have already submitted this exam.')
+          localStorage.removeItem('active_exam_code')
         } else {
           toast.error(error.error || 'Failed to join exam')
         }
@@ -56,8 +61,16 @@ const JoinExam = () => {
 
       const data = await response.json()
 
-      // Success - redirect to exam page with data
-      toast.success('Exam started successfully!')
+      // Save active exam code in case of accidental browser close or reboot
+      localStorage.setItem('active_exam_code', examCode.trim())
+
+      // Inform student if previous session was restored
+      if (data.is_rejoin) {
+        toast.success('Exam session restored! Resumed with previously selected answers.')
+      } else {
+        toast.success('Exam started successfully!')
+      }
+
       navigate('/student/exam', {
         state: {
           examData: data,
@@ -65,12 +78,14 @@ const JoinExam = () => {
         }
       })
 
-    } catch (error) {
+    } catch (error: any) {
       toast.error('Network error: ' + error.message)
     } finally {
       setLoading(false)
     }
   }
+
+  const isResuming = savedCode && savedCode === examCode.trim()
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -80,9 +95,11 @@ const JoinExam = () => {
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <BookOpen className="w-8 h-8 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Join Exam</CardTitle>
-            <p className="text-muted-foreground">
-              Enter your exam code to start the test
+            <CardTitle className="text-2xl">{isResuming ? 'Resume Exam' : 'Join Exam'}</CardTitle>
+            <p className="text-muted-foreground text-sm">
+              {isResuming 
+                ? 'Your device was disconnected. Rejoin to continue where you left off.' 
+                : 'Enter your exam code to start the test'}
             </p>
           </CardHeader>
           <CardContent>
@@ -92,23 +109,24 @@ const JoinExam = () => {
                   placeholder="Enter exam code"
                   value={examCode}
                   onChange={(e) => setExamCode(e.target.value.toUpperCase())}
-                  className="text-center text-lg font-mono"
+                  className="text-center text-lg font-mono tracking-wider uppercase font-semibold"
                   disabled={loading}
+                  autoFocus
                 />
               </div>
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full bg-blue-600 hover:bg-blue-700"
                 disabled={loading || !examCode.trim()}
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Joining Exam...
+                    {isResuming ? 'Restoring Test Session...' : 'Joining Exam...'}
                   </>
                 ) : (
-                  'Join Exam'
+                  isResuming ? 'Resume Exam Session' : 'Start Exam'
                 )}
               </Button>
             </form>

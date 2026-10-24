@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { Loader2, ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '@/lib/envs'
+import { AdminLayout } from '@/components/admin/AdminLayout'
 
 interface Class {
   id: string
@@ -218,17 +219,27 @@ const CreateExam = () => {
   const selectedSubjectName = subjects.find(s => s.id === selectedSubject)?.name || ''
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
+    <AdminLayout>
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Link to="/admin">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold">Create Rule-Based Exam</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Link to="/admin/exams" className="text-xs font-semibold text-slate-500 hover:text-blue-600 flex items-center gap-1">
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to Exams
+              </Link>
+              <span className="text-xs text-slate-300">•</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60">
+                Rule-Based Generator
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-slate-900 tracking-tight">
+              Create Rule-Based Exam
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Specify chapter quotas and difficulty targets for automated question selection.
+            </p>
+          </div>
         </div>
 
         {/* Exam Details Form */}
@@ -415,7 +426,7 @@ const CreateExam = () => {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AdminLayout>
   )
 }
 

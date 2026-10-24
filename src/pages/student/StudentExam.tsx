@@ -5,8 +5,29 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Clock, Send, AlertTriangle } from 'lucide-react'
+import { 
+  Clock, 
+  Send, 
+  AlertTriangle, 
+  Bookmark, 
+  RotateCcw, 
+  ChevronLeft, 
+  ChevronRight, 
+  CheckCircle2, 
+  ShieldAlert, 
+  Layers,
+  HelpCircle,
+  Eye
+} from 'lucide-react'
 import { API_BASE_URL } from '@/lib/envs'
 import 'katex/dist/katex.min.css'
 import { InlineMath, BlockMath } from 'react-katex'
@@ -18,6 +39,8 @@ interface Question {
   section_id: string
   section_name: string
   subject_name: string
+  marks?: number
+  negative_marks?: number
   options: Array<{
     key: string
     text: string
@@ -29,30 +52,118 @@ interface ExamData {
   remaining_time_in_seconds: number
   questions: Question[]
   attempt_id: string
+  previous_answers?: Record<string, string | null>
+  is_rejoin?: boolean
 }
 
 const StudentExam = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const examData = location.state?.examData as ExamData
-  const examCode = location.state?.examCode as string
+  
+  const [examData, setExamData] = useState<ExamData | null>(location.state?.examData || null)
+  const [examCode, setExamCode] = useState<string>(
+    location.state?.examCode || localStorage.getItem('active_exam_code') || ''
+  )
+  const [restoringSession, setRestoringSession] = useState(
+    !location.state?.examData && Boolean(localStorage.getItem('active_exam_code'))
+  )
 
   const [timeLeft, setTimeLeft] = useState(examData?.remaining_time_in_seconds || 0)
   const [answers, setAnswers] = useState<Record<string, string | null>>({})
+  const [markedForReview, setMarkedForReview] = useState<Record<string, boolean>>({})
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [submitting, setSubmitting] = useState(false)
-  const [currentSection, setCurrentSection] = useState(0)
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
+  const [showSubmitModal, setShowSubmitModal] = useState(false)
 
-  // Load saved answers from localStorage
+  // Auto-restore test session if student reloaded page or reopened tab
+  useEffect(() => {
+    if (!examData && examCode) {
+      setRestoringSession(true)
+      const restoreSession = async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (!session) {
+            navigate('/auth')
+            return
+          }
+
+          const response = await fetch(`${API_BASE_URL}/api/start-exam`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ examCode: examCode.trim() })
+          })
+
+          if (!response.ok) {
+            const err = await response.json()
+            toast.error(err.error || 'Failed to restore test session')
+            localStorage.removeItem('active_exam_code')
+            navigate('/student/join')
+            return
+          }
+
+          const data = await response.json()
+          setExamData(data)
+          setTimeLeft(data.remaining_time_in_seconds || 0)
+          toast.success('Test session recovered successfully!')
+        } catch (err: any) {
+          toast.error('Network error during session recovery: ' + err.message)
+          navigate('/student/join')
+        } finally {
+          setRestoringSession(false)
+        }
+      }
+      restoreSession()
+    }
+  }, [examData, examCode, navigate])
+
+  // Persist active exam code to localStorage
   useEffect(() => {
     if (examCode) {
-      const saved = localStorage.getItem(`exam_${examCode}_answers`)
-      if (saved) {
-        setAnswers(JSON.parse(saved))
-      }
+      localStorage.setItem('active_exam_code', examCode)
     }
   }, [examCode])
+
+  // Load saved answers: merge server previous_answers and localStorage
+  useEffect(() => {
+    let combinedAnswers: Record<string, string | null> = {}
+
+    // 1. First, populate answers previously recorded on server
+    if (examData?.previous_answers && typeof examData.previous_answers === 'object') {
+      combinedAnswers = { ...examData.previous_answers }
+    }
+
+    // 2. Overlay localStorage if available on this device
+    if (examCode) {
+      const savedAnswers = localStorage.getItem(`exam_${examCode}_answers`)
+      if (savedAnswers) {
+        try {
+          const parsed = JSON.parse(savedAnswers)
+          combinedAnswers = { ...combinedAnswers, ...parsed }
+        } catch (e) {
+          console.error('Failed to parse cached answers:', e)
+        }
+      }
+      const savedReview = localStorage.getItem(`exam_${examCode}_review`)
+      if (savedReview) {
+        try {
+          setMarkedForReview(JSON.parse(savedReview))
+        } catch (e) {
+          console.error('Failed to parse cached review marks:', e)
+        }
+      }
+    }
+
+    if (Object.keys(combinedAnswers).length > 0) {
+      setAnswers(combinedAnswers)
+      if (examCode) {
+        localStorage.setItem(`exam_${examCode}_answers`, JSON.stringify(combinedAnswers))
+      }
+    }
+  }, [examCode, examData])
 
   // Save answers to localStorage
   useEffect(() => {
@@ -60,6 +171,37 @@ const StudentExam = () => {
       localStorage.setItem(`exam_${examCode}_answers`, JSON.stringify(answers))
     }
   }, [answers, examCode])
+
+  // Save review flags to localStorage
+  useEffect(() => {
+    if (examCode && Object.keys(markedForReview).length > 0) {
+      localStorage.setItem(`exam_${examCode}_review`, JSON.stringify(markedForReview))
+    }
+  }, [markedForReview, examCode])
+
+  // Real-time server persistence for selected answers
+  const persistAnswerToServer = async (questionId: string, value: string | null) => {
+    if (!examData?.attempt_id) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      await fetch(`${API_BASE_URL}/api/save-answer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          attempt_id: examData.attempt_id,
+          question_id: questionId,
+          selected_option: value
+        })
+      })
+    } catch (err) {
+      console.warn('Real-time answer save warning:', err)
+    }
+  }
 
   // Timer countdown with server sync
   useEffect(() => {
@@ -75,7 +217,6 @@ const StudentExam = () => {
       })
     }, 1000)
 
-    // Sync with server every 30 seconds
     const syncTimer = setInterval(() => {
       syncTimeWithServer()
     }, 30000)
@@ -92,68 +233,48 @@ const StudentExam = () => {
       if (document.hidden) {
         setTabSwitchCount(prev => {
           const newCount = prev + 1
-          // Send to backend
           updateTabSwitchCount(newCount)
           return newCount
         })
-        toast.warning('Tab switch detected! This activity is being monitored.')
+        toast.warning('Warning: Tab switch detected! All focus departures are logged.')
       }
-    }
-
-    const handleWindowBlur = () => {
-      setTabSwitchCount(prev => {
-        const newCount = prev + 1
-        updateTabSwitchCount(newCount)
-        return newCount
-      })
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('blur', handleWindowBlur)
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('blur', handleWindowBlur)
-    }
-  }, [examData?.attempt_id])
-
-  // Anti-cheating: Disable right click and text selection
-  useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => e.preventDefault()
-    const handleSelectStart = (e: Event) => e.preventDefault()
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Disable F12, Ctrl+Shift+I, Ctrl+U, Ctrl+C, Ctrl+V
-      if (e.key === 'F12' ||
-        (e.ctrlKey && e.shiftKey && e.key === 'I') ||
-        (e.ctrlKey && e.key === 'u') ||
-        (e.ctrlKey && (e.key === 'c' || e.key === 'v'))) {
-        e.preventDefault()
-        toast.error('This action is disabled during the exam')
-      }
-    }
-
-    document.addEventListener('contextmenu', handleContextMenu)
-    document.addEventListener('selectstart', handleSelectStart)
-    document.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.removeEventListener('contextmenu', handleContextMenu)
-      document.removeEventListener('selectstart', handleSelectStart)
-      document.removeEventListener('keydown', handleKeyDown)
     }
   }, [])
 
-  const handleAutoSubmit = useCallback(async () => {
-    toast.warning('Time expired! Auto-submitting exam...')
-    await submitExam()
-  }, [])
+  // Sync remaining time with backend
+  const syncTimeWithServer = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
 
+      await fetch(`${API_BASE_URL}/api/student/sync-time`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          attempt_id: examData.attempt_id,
+          remaining_time_in_seconds: timeLeft
+        })
+      })
+    } catch (error) {
+      console.error('Time sync error:', error)
+    }
+  }
+
+  // Record tab switch in backend
   const updateTabSwitchCount = async (count: number) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      await fetch(`${API_BASE_URL}/api/update-tab-switches`, {
+      await fetch(`${API_BASE_URL}/api/student/log-infraction`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -165,68 +286,29 @@ const StudentExam = () => {
         })
       })
     } catch (error) {
-      console.error('Failed to update tab switch count:', error)
+      console.error('Infraction logging error:', error)
     }
   }
 
-  const syncTimeWithServer = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-
-      const response = await fetch(`${API_BASE_URL}/api/exam-time-sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          attempt_id: examData.attempt_id
-        })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setTimeLeft(data.remaining_time_in_seconds)
-      }
-    } catch (error) {
-      console.error('Failed to sync time with server:', error)
-    }
-  }
+  const handleAutoSubmit = useCallback(() => {
+    toast.error('Time has expired! Submitting your test automatically...')
+    submitExam()
+  }, [])
 
   const submitExam = async () => {
-    if (submitting) return
-
-    // Show confirmation alert
-    const answeredQuestions = Object.values(answers).filter(answer => answer !== null).length
-    const unattemptedCount = questions.length - answeredQuestions
-    const confirmMessage = unattemptedCount > 0
-      ? `Are you sure you want to submit the exam?\n\nYou have ${unattemptedCount} unattempted questions.`
-      : 'Are you sure you want to submit the exam?'
-
-    if (!window.confirm(confirmMessage)) {
-      return
-    }
-
     setSubmitting(true)
-    console.log(Object.entries(answers).map(([questionId, selectedOption]) => ({
-      question_id: questionId,
-      selected_option: selectedOption
-    })));
-
     try {
-      const answersArray = questions.map(question => ({
-        question_id: question.id,
-        selected_option: answers[question.id] || null
-      }))
-
       const { data: { session } } = await supabase.auth.getSession()
-
       if (!session) {
-        toast.error('Session expired. Please login again.')
+        toast.error('Session expired. Please log in again.')
         navigate('/auth')
         return
       }
+
+      const answersArray = Object.entries(answers).map(([question_id, selected_option]) => ({
+        question_id,
+        selected_option: selected_option || null
+      }))
 
       const response = await fetch(`${API_BASE_URL}/api/submit-exam`, {
         method: 'POST',
@@ -252,26 +334,34 @@ const StudentExam = () => {
 
       const data = await response.json()
 
-      // Clear saved answers
       if (examCode) {
         localStorage.removeItem(`exam_${examCode}_answers`)
+        localStorage.removeItem(`exam_${examCode}_review`)
+        localStorage.removeItem('active_exam_code')
       }
 
       toast.success('Exam submitted successfully!')
       navigate('/student/results', { state: { results: data } })
-    } catch (error) {
+    } catch (error: any) {
       toast.error('Failed to submit exam: ' + error.message)
     } finally {
       setSubmitting(false)
+      setShowSubmitModal(false)
     }
   }
 
-  const handleAnswerChange = (questionId: string, value: string | null) => {
+  const handleAnswerChange = (questionId: string, value: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }))
+    persistAnswerToServer(questionId, value)
   }
 
   const clearResponse = (questionId: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: null }))
+    persistAnswerToServer(questionId, null)
+  }
+
+  const toggleMarkForReview = (questionId: string) => {
+    setMarkedForReview(prev => ({ ...prev, [questionId]: !prev[questionId] }))
   }
 
   const formatTime = (seconds: number) => {
@@ -281,68 +371,22 @@ const StudentExam = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
+  // Math rendering helper
   const renderMathText = (text: string) => {
-    if (!text) return text
-
-    // Debug log to see the actual text
-    console.log('Rendering text:', text)
-
-    try {
-      // Handle both $$....$$ and $....$ patterns
-      const parts = []
-      let currentIndex = 0
-
-      // First handle block math ($$...$$)
-      const blockMathRegex = /\$\$([^$]+?)\$\$/g
-      let match
-
-      while ((match = blockMathRegex.exec(text)) !== null) {
-        // Add text before the math
-        if (match.index > currentIndex) {
-          const beforeText = text.slice(currentIndex, match.index)
-          parts.push(...renderInlineMath(beforeText))
-        }
-
-        // Add block math
-        parts.push(<BlockMath key={`block-${match.index}`} math={match[1]} />)
-        currentIndex = match.index + match[0].length
-      }
-
-      // Add remaining text
-      if (currentIndex < text.length) {
-        const remainingText = text.slice(currentIndex)
-        parts.push(...renderInlineMath(remainingText))
-      }
-
-      return parts.length > 0 ? parts : text
-    } catch (error) {
-      console.error('Math rendering error:', error)
-      return text
-    }
-  }
-
-  const renderInlineMath = (text: string) => {
-    if (!text) return []
-
+    if (!text) return null
     const parts = []
     let currentIndex = 0
-
-    // Handle inline math ($...$)
-    const inlineMathRegex = /\$([^$]+?)\$/g
+    const inlineMathRegex = /\$([^\$]+)\$/g
     let match
 
     while ((match = inlineMathRegex.exec(text)) !== null) {
-      // Add text before the math
       if (match.index > currentIndex) {
         parts.push(text.slice(currentIndex, match.index))
       }
-
-      // Add inline math
       parts.push(<InlineMath key={`inline-${match.index}`} math={match[1]} />)
       currentIndex = match.index + match[0].length
     }
 
-    // Add remaining text
     if (currentIndex < text.length) {
       parts.push(text.slice(currentIndex))
     }
@@ -350,33 +394,54 @@ const StudentExam = () => {
     return parts.length > 0 ? parts : [text]
   }
 
-  if (!examData || !examData.questions || examData.questions.length === 0) {
+  if (restoringSession) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card>
-          <CardContent className="pt-6">
-            <p>No questions found for this exam. Please contact your instructor.</p>
-            <Button onClick={() => navigate('/student/join')} className="mt-4">
-              Back to Join Exam
-            </Button>
-          </CardContent>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-slate-200 shadow-sm text-center p-6 space-y-4">
+          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
+            <Clock className="w-6 h-6 animate-spin" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Restoring Active Exam Session</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Recovering your questions and previously selected answers...
+            </p>
+          </div>
         </Card>
       </div>
     )
   }
-  console.log(examData);
+
+  if (!examData || !examData.questions || examData.questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-slate-200 shadow-sm text-center p-6">
+          <HelpCircle className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-slate-900">Exam Session Unavailable</h2>
+          <p className="text-xs text-slate-500 mt-1 mb-5">
+            No questions could be loaded for this test. Please verify the exam code with your instructor.
+          </p>
+          <Button onClick={() => navigate('/student/join')} className="w-full bg-blue-600 hover:bg-blue-700">
+            Return to Exam Join Portal
+          </Button>
+        </Card>
+      </div>
+    )
+  }
 
   const questions = examData.questions
   const question = questions[currentQuestion]
-  const answeredCount = Object.values(answers).filter(answer => answer !== null).length
+  const answeredCount = Object.values(answers).filter(val => val !== null && val !== '').length
+  const markedCount = Object.values(markedForReview).filter(Boolean).length
+  const unansweredCount = questions.length - answeredCount
 
   // Group questions by section
   const sections = questions.reduce((acc, q, index) => {
-    const sectionId = q.section_id
+    const sectionId = q.section_id || 'default'
     if (!acc[sectionId]) {
       acc[sectionId] = {
-        name: q.section_name,
-        subject: q.subject_name,
+        name: q.section_name || 'Section',
+        subject: q.subject_name || 'Subject',
         questions: [],
         startIndex: index
       }
@@ -386,11 +451,10 @@ const StudentExam = () => {
   }, {} as Record<string, { name: string; subject: string; questions: (Question & { globalIndex: number })[]; startIndex: number }>)
 
   const sectionArray = Object.values(sections)
-  console.log(question);
 
   return (
     <div
-      className="min-h-screen bg-background p-4"
+      className="min-h-screen bg-slate-100/60 flex flex-col font-sans select-none"
       style={{
         userSelect: 'none',
         WebkitUserSelect: 'none',
@@ -399,204 +463,389 @@ const StudentExam = () => {
         WebkitTouchCallout: 'none'
       }}
     >
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-2xl font-bold">Exam in Progress</h1>
-                <p className="text-muted-foreground">
-                  Question {currentQuestion + 1} of {questions.length} •
-                  Answered: {answeredCount}/{questions.length}
-                  {tabSwitchCount > 0 && (
-                    <span className="text-red-600 ml-2">• Tab switches: {tabSwitchCount}</span>
-                  )}
-                </p>
-              </div>
-              <div className="text-right">
-                <div className={`text-2xl font-mono font-bold ${timeLeft < 300 ? 'text-red-600' : 'text-primary'}`}>
-                  <Clock className="w-5 h-5 inline mr-2" />
-                  {formatTime(timeLeft)}
-                </div>
-                {timeLeft < 300 && (
-                  <p className="text-sm text-red-600 flex items-center gap-1">
-                    <AlertTriangle className="w-4 h-4" />
-                    Less than 5 minutes left!
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Question */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Question {currentQuestion + 1}</span>
-              <span className="text-sm font-normal text-muted-foreground">
-                {question.subject_name} - {question.section_name}
+      {/* Top Testing Header */}
+      <header className="sticky top-0 z-40 bg-white border-b border-slate-200/80 shadow-xs px-4 sm:px-6 py-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold flex items-center justify-center text-xs shadow-xs">
+            EA
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="font-display font-bold text-slate-900 text-sm sm:text-base tracking-tight">
+                Exam Ace Testing System
+              </h1>
+              <span className="hidden sm:inline-block text-[10px] font-semibold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200/60">
+                CBT Active
               </span>
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            {/* Question Image - only shown if available */}
-            {question.image_url && (
-              <div className="mb-6">
-                <img
-                  src={question.image_url}
-                  alt="Question image"
-                  loading="lazy"
-                  className="w-full max-w-2xl mx-auto h-auto object-contain rounded-lg border shadow-sm"
-                  style={{ maxHeight: '400px' }}
-                />
-              </div>
-            )}
-
-            {/* Question Text */}
-            <div className="text-lg mb-6">
-              {renderMathText(question.question_text)}
             </div>
+            <p className="text-[11px] text-slate-500">
+              Exam Code: <span className="font-mono font-semibold text-slate-700">{examCode || "Live Session"}</span>
+            </p>
+          </div>
+        </div>
 
-            {/* Options */}
-            <RadioGroup
-              value={answers[question.id] || ''}
-              onValueChange={(value) => handleAnswerChange(question.id, value)}
-            >
-              {question.options.map((option) => (
-                <div
-                  key={option.key}
-                  className="flex items-start space-x-2 p-3 rounded-lg border hover:bg-muted/50"
-                >
-                  <RadioGroupItem
-                    value={option.key}
-                    id={`${question.id}_${option.key}`}
-                    className="mt-1"
-                  />
+        {/* Timer and Header Actions */}
+        <div className="flex items-center gap-3">
+          {tabSwitchCount > 0 && (
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>{tabSwitchCount} Infractions</span>
+            </div>
+          )}
 
-                  <Label
-                    htmlFor={`${question.id}_${option.key}`}
-                    className="flex-1 cursor-pointer"
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono font-bold text-sm sm:text-base ${
+            timeLeft < 300 
+              ? 'bg-rose-50 text-rose-700 border-rose-300 animate-pulse' 
+              : 'bg-slate-50 text-slate-900 border-slate-200'
+          }`}>
+            <Clock className={`w-4 h-4 ${timeLeft < 300 ? 'text-rose-600' : 'text-blue-600'}`} />
+            <span>{formatTime(timeLeft)}</span>
+          </div>
+
+          <Button
+            onClick={() => setShowSubmitModal(true)}
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs"
+          >
+            <Send className="w-3.5 h-3.5 mr-1.5" />
+            Finish & Submit
+          </Button>
+        </div>
+      </header>
+
+      {/* Main Examination Body - 2 Columns */}
+      <div className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Left Column: Question Area (8 of 12 cols) */}
+        <div className="lg:col-span-8 flex flex-col space-y-4">
+          {/* Section Selector Tabs */}
+          {sectionArray.length > 1 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {sectionArray.map((sec) => {
+                const isCurrentSec = currentQuestion >= sec.startIndex && currentQuestion < sec.startIndex + sec.questions.length
+                const answeredInSec = sec.questions.filter(q => answers[q.id] !== null && answers[q.id] !== '').length
+                return (
+                  <button
+                    key={sec.name}
+                    onClick={() => setCurrentQuestion(sec.startIndex)}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap border ${
+                      isCurrentSec
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
                   >
-                    <div className="flex gap-2">
-                      <span className="font-medium">
-                        {option.key}.
-                      </span>
-
-                      <div className="flex-1">
-                        {/* Option Text */}
-                        {option.text && (
-                          <span>{renderMathText(option.text)}</span>
-                        )}
-
-                        {/* Option Image - only shown if available */}
-                        {option.image_url && (
-                          <div className={option.text ? 'mt-3' : ''}>
-                            <img
-                              src={option.image_url}
-                              alt={`Option ${option.key}`}
-                              loading="lazy"
-                              className="max-w-full h-auto max-h-64 object-contain rounded-lg border"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-
-            {/* Clear Response Button */}
-            <div className="mt-4 flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => clearResponse(question.id)}
-                disabled={!answers[question.id]}
-                className="text-red-600 border-red-200 hover:bg-red-50"
-              >
-                Clear Response
-              </Button>
+                    <span>{sec.subject}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      isCurrentSec ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {answeredInSec}/{sec.questions.length}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-          </CardContent>
-        </Card>
+          )}
 
-        {/* Navigation */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-center">
-              <div className="flex gap-2">
+          {/* Active Question Card */}
+          <Card className="flex-1 border-slate-200/80 shadow-xs bg-white rounded-xl overflow-hidden flex flex-col justify-between">
+            <CardHeader className="py-3 px-5 border-b border-slate-100 bg-slate-50/50 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="w-7 h-7 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+                  Q{currentQuestion + 1}
+                </span>
+                <div>
+                  <span className="text-xs font-bold text-slate-900">
+                    {question.subject_name || "General"}
+                  </span>
+                  <span className="text-xs text-slate-400 mx-1.5">•</span>
+                  <span className="text-xs text-slate-500 font-medium">
+                    {question.section_name || "Section"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  +{question.marks || 4} Marks
+                </span>
+                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                  -{question.negative_marks || 1} Neg
+                </span>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-5 sm:p-6 space-y-6 flex-1">
+              {/* Question Text */}
+              <div className="text-sm sm:text-base text-slate-900 leading-relaxed font-sans font-medium">
+                {renderMathText(question.question_text)}
+              </div>
+
+              {/* Question Diagram / Image */}
+              {question.image_url && (
+                <div className="my-4 p-2 bg-slate-50 rounded-xl border border-slate-200 max-w-xl mx-auto flex items-center justify-center">
+                  <img
+                    src={question.image_url}
+                    alt="Question Diagram"
+                    loading="lazy"
+                    className="max-h-72 w-auto object-contain rounded-lg shadow-xs"
+                  />
+                </div>
+              )}
+
+              {/* Multiple Choice Options */}
+              <div className="pt-2">
+                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                  Select Correct Alternative:
+                </p>
+                <div className="space-y-2.5">
+                  {question.options.map((option) => {
+                    const isSelected = answers[question.id] === option.key
+                    return (
+                      <div
+                        key={option.key}
+                        onClick={() => handleAnswerChange(question.id, option.key)}
+                        className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-blue-50/70 border-blue-500 ring-1 ring-blue-500 shadow-xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                        }`}
+                      >
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
+                          isSelected
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}>
+                          {option.key}
+                        </div>
+
+                        <div className="flex-1 text-xs sm:text-sm text-slate-800 leading-relaxed pt-1">
+                          {option.text && renderMathText(option.text)}
+                          {option.image_url && (
+                            <div className="mt-2">
+                              <img
+                                src={option.image_url}
+                                alt={`Option ${option.key}`}
+                                loading="lazy"
+                                className="max-h-48 w-auto object-contain rounded border border-slate-200"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </CardContent>
+
+            {/* Bottom Question Controls */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
+                  size="sm"
+                  onClick={() => toggleMarkForReview(question.id)}
+                  className={`text-xs ${
+                    markedForReview[question.id]
+                      ? 'bg-purple-50 text-purple-700 border-purple-300 font-semibold'
+                      : 'text-slate-600'
+                  }`}
+                >
+                  <Bookmark className="w-3.5 h-3.5 mr-1 text-purple-600" />
+                  {markedForReview[question.id] ? "Marked for Review" : "Mark for Review"}
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => clearResponse(question.id)}
+                  disabled={!answers[question.id]}
+                  className="text-xs text-slate-500 hover:text-rose-600"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  Clear Selection
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setCurrentQuestion(prev => Math.max(0, prev - 1))}
                   disabled={currentQuestion === 0}
+                  className="text-xs text-slate-700"
                 >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
                   Previous
                 </Button>
+
                 <Button
-                  variant="outline"
+                  size="sm"
                   onClick={() => setCurrentQuestion(prev => Math.min(questions.length - 1, prev + 1))}
                   disabled={currentQuestion === questions.length - 1}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4"
                 >
-                  Next
+                  Save & Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               </div>
+            </div>
+          </Card>
+        </div>
 
-              <Button
-                onClick={submitExam}
-                disabled={submitting || answeredCount === 0}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <Send className="w-4 h-4 mr-2" />
-                {submitting ? 'Submitting...' : 'Submit Exam'}
-              </Button>
+        {/* Right Column: Palette & Status (4 of 12 cols) */}
+        <div className="lg:col-span-4 flex flex-col space-y-4">
+          <Card className="border-slate-200/80 shadow-xs bg-white rounded-xl p-4 sm:p-5 space-y-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Question Palette</h3>
+              <p className="text-xs text-slate-500">Jump to any question instantly</p>
             </div>
 
-            {/* Section Navigator */}
-            <div className="mt-6">
-              <p className="text-sm font-medium mb-3">Sections:</p>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {sectionArray.map((section, index) => {
-                  const sectionAnswered = section.questions.filter(q => answers[q.id] && answers[q.id] !== null).length
+            {/* Legend */}
+            <div className="grid grid-cols-2 gap-2 text-[11px] pb-3 border-b border-slate-100 font-medium">
+              <div className="flex items-center gap-1.5 text-slate-700">
+                <span className="w-3 h-3 rounded bg-emerald-500"></span>
+                <span>Answered ({answeredCount})</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-700">
+                <span className="w-3 h-3 rounded bg-slate-200"></span>
+                <span>Unanswered ({unansweredCount})</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-700">
+                <span className="w-3 h-3 rounded bg-purple-500"></span>
+                <span>Marked ({markedCount})</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-700">
+                <span className="w-3 h-3 rounded ring-2 ring-blue-600 bg-white"></span>
+                <span>Current</span>
+              </div>
+            </div>
+
+            {/* Interactive Question Grid */}
+            <div className="p-2.5 bg-slate-50/70 rounded-xl border border-slate-200/80 max-h-80 overflow-y-auto">
+              <div className="grid grid-cols-5 gap-2.5">
+                {questions.map((q, index) => {
+                  const isCurrent = currentQuestion === index
+                  const isAnswered = answers[q.id] !== null && answers[q.id] !== '' && answers[q.id] !== undefined
+                  const isMarked = markedForReview[q.id]
+
+                  let tileStyle = "bg-white text-slate-700 border-slate-200 hover:bg-slate-100/80 shadow-xs"
+
+                  if (isAnswered && isMarked) {
+                    tileStyle = "bg-purple-100 text-purple-900 border-purple-400 font-bold relative shadow-xs"
+                  } else if (isMarked) {
+                    tileStyle = "bg-purple-50 text-purple-700 border-purple-300 font-semibold shadow-xs"
+                  } else if (isAnswered) {
+                    tileStyle = "bg-emerald-100 text-emerald-800 border-emerald-300 font-bold shadow-xs"
+                  }
+
+                  if (isCurrent) {
+                    tileStyle += " ring-2 ring-blue-600 ring-offset-2 ring-offset-slate-50 font-bold"
+                  }
+
                   return (
-                    <Button
-                      key={section.name}
-                      variant="outline"
-                      size="sm"
-                      className={`${currentQuestion >= section.startIndex && currentQuestion < section.startIndex + section.questions.length ? 'bg-blue-100 border-blue-300' : ''}`}
-                      onClick={() => setCurrentQuestion(section.startIndex)}
+                    <button
+                      key={q.id}
+                      onClick={() => setCurrentQuestion(index)}
+                      className={`h-10 w-full rounded-lg text-xs font-mono font-semibold flex items-center justify-center border transition-all relative ${tileStyle}`}
                     >
-                      {section.subject}
-                      <span className="ml-1 text-xs">({sectionAnswered}/{section.questions.length})</span>
-                    </Button>
+                      {index + 1}
+                      {isAnswered && isMarked && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      )}
+                    </button>
                   )
                 })}
               </div>
-
-              <p className="text-sm font-medium mb-3">Question Navigator:</p>
-              <div className="grid grid-cols-10 gap-2">
-                {questions.map((_, index) => (
-                  <Button
-                    key={index}
-                    variant={currentQuestion === index ? 'default' : 'outline'}
-                    size="sm"
-                    className={`w-10 h-10 p-0 ${answers[questions[index].id] && answers[questions[index].id] !== null
-                      ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200'
-                      : ''
-                      }`}
-                    onClick={() => setCurrentQuestion(index)}
-                  >
-                    {index + 1}
-                  </Button>
-                ))}
-              </div>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Section Summary breakdown */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Section Progress
+              </p>
+              {sectionArray.map((sec) => {
+                const answered = sec.questions.filter(q => answers[q.id] !== null && answers[q.id] !== '').length
+                const pct = Math.round((answered / sec.questions.length) * 100)
+                return (
+                  <div key={sec.name} className="space-y-1">
+                    <div className="flex justify-between text-xs text-slate-700">
+                      <span className="font-medium">{sec.subject}</span>
+                      <span className="font-semibold text-slate-900">{answered}/{sec.questions.length} ({pct}%)</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${pct}%` }}></div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Final Submit Button */}
+            <div className="pt-2">
+              <Button
+                onClick={() => setShowSubmitModal(true)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 text-xs shadow-sm"
+              >
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Submit Complete Test
+              </Button>
+            </div>
+          </Card>
+        </div>
       </div>
+
+      {/* Confirmation Submit Dialog */}
+      <Dialog open={showSubmitModal} onOpenChange={setShowSubmitModal}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Confirm Examination Submission
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Please review your question response statistics before submitting. Once submitted, you cannot change your answers.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-2 gap-3 my-4">
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <p className="text-xs text-slate-500">Total Questions</p>
+              <p className="text-xl font-bold text-slate-900">{questions.length}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+              <p className="text-xs text-emerald-700 font-medium">Answered</p>
+              <p className="text-xl font-bold text-emerald-800">{answeredCount}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-purple-50 border border-purple-200">
+              <p className="text-xs text-purple-700 font-medium">Marked for Review</p>
+              <p className="text-xl font-bold text-purple-800">{markedCount}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200">
+              <p className="text-xs text-rose-700 font-medium">Unanswered</p>
+              <p className="text-xl font-bold text-rose-800">{unansweredCount}</p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowSubmitModal(false)}
+              className="text-xs"
+            >
+              Continue Test
+            </Button>
+            <Button
+              type="button"
+              onClick={submitExam}
+              disabled={submitting}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold"
+            >
+              {submitting ? "Finalizing Submission..." : "Yes, Submit Exam"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
